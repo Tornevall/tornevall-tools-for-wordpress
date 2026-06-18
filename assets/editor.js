@@ -1,7 +1,7 @@
 (function (wp) {
 	'use strict';
 
-	if (!wp || !wp.plugins || !wp.element || !wp.components || !wp.apiFetch || !wp.data || !wp.blocks) {
+	if (!wp || !wp.plugins || !wp.element || !wp.components || !wp.apiFetch || !wp.data || !wp.blocks || !wp.hooks) {
 		return;
 	}
 
@@ -9,6 +9,7 @@
 	var Fragment = wp.element.Fragment;
 	var useState = wp.element.useState;
 	var __ = wp.i18n.__;
+	var addFilter = wp.hooks.addFilter;
 	var registerPlugin = wp.plugins.registerPlugin;
 	var registerBlockType = wp.blocks.registerBlockType;
 	var createBlock = wp.blocks.createBlock;
@@ -18,8 +19,10 @@
 	var editorPackage = wp.editor || {};
 	var PluginSidebar = editorPackage.PluginSidebar || editPost.PluginSidebar;
 	var PluginSidebarMoreMenuItem = editorPackage.PluginSidebarMoreMenuItem || editPost.PluginSidebarMoreMenuItem;
+	var BlockControls = blockEditor && blockEditor.BlockControls;
 	var components = wp.components;
 	var Button = components.Button;
+	var Modal = components.Modal;
 	var Notice = components.Notice;
 	var PanelBody = components.PanelBody;
 	var Placeholder = components.Placeholder;
@@ -27,6 +30,7 @@
 	var Spinner = components.Spinner;
 	var TextareaControl = components.TextareaControl;
 	var TextControl = components.TextControl;
+	var ToolbarDropdownMenu = components.ToolbarDropdownMenu;
 	var settings = window.TTFWAI || {};
 
 	function escapeHtml(value) {
@@ -252,6 +256,27 @@
 		};
 	}
 
+	function defaultModelForProvider(provider) {
+		return provider === 'openai' ? (settings.openaiModel || '') : (settings.toolsModel || '');
+	}
+
+	function runAiRequest(request) {
+		return apiFetch({
+			path: settings.endpoint || '/ttfw/v1/ai/respond',
+			method: 'POST',
+			data: {
+				provider: request.provider || settings.defaultProvider || 'tools',
+				prompt: request.prompt || '',
+				custom_text: request.customText || '',
+				context: request.context || '',
+				persona: request.persona || settings.defaultPersona || '',
+				model: request.model || defaultModelForProvider(request.provider || settings.defaultProvider || 'tools'),
+				response_language: settings.responseLanguage || 'auto',
+				output_format: request.outputFormat || 'wp_markdown'
+			}
+		});
+	}
+
 	function runAi(state) {
 		var provider = state.provider[0];
 		var prompt = state.prompt[0];
@@ -267,19 +292,14 @@
 		}
 		setIsLoading(true);
 
-		return apiFetch({
-			path: settings.endpoint || '/ttfw/v1/ai/respond',
-			method: 'POST',
-			data: {
-				provider: provider,
-				prompt: prompt,
-				custom_text: state.customText[0],
-				context: selectedBlockContext(),
-				persona: state.persona[0],
-				model: state.model[0],
-				response_language: settings.responseLanguage || 'auto',
-				output_format: 'wp_markdown'
-			}
+		return runAiRequest({
+			provider: provider,
+			prompt: prompt,
+			customText: state.customText[0],
+			context: selectedBlockContext(),
+			persona: state.persona[0],
+			model: state.model[0],
+			outputFormat: 'wp_markdown'
 		}).then(function (response) {
 			setResult(response && response.text ? response.text : '');
 		}).catch(function (error) {
@@ -334,7 +354,7 @@
 				],
 				onChange: function (value) {
 					setProvider(value);
-					setModel(value === 'openai' ? (settings.openaiModel || '') : (settings.toolsModel || ''));
+					setModel(defaultModelForProvider(value));
 				}
 			}),
 			el(TextControl, {
@@ -451,6 +471,152 @@
 		);
 	}
 
+	function getRewriteSourceText(clientId, props) {
+		var select = wp.data.select('core/block-editor');
+		var block = select.getBlock && clientId ? select.getBlock(clientId) : null;
+		var source = blockToText(block);
+
+		if (!source && props) {
+			source = blockToText({attributes: props.attributes || {}, innerBlocks: []});
+		}
+
+		return limit(source, 50000);
+	}
+
+	function toolbarActionPrompt(action) {
+		var prompts = {
+			rephrase: __('Rewrite the selected block in a clear new wording. Keep the meaning, but do not keep the original sentence structure. Return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			simplify: __('Simplify the selected block. Keep the important meaning, remove unnecessary complexity, and return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			summarize: __('Summarize the selected block. Keep only the important points and return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			expand: __('Expand the selected block with useful detail while staying faithful to the source text. Return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			shorten: __('Make the selected block shorter and sharper. Keep the core meaning and return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			clearer: __('Rewrite the selected block so it becomes clearer, more direct, and easier to read. Return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			formal: __('Rewrite the selected block in a more formal and professional tone. Return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			casual: __('Rewrite the selected block in a more relaxed and conversational tone. Return clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			swedish: __('Translate the selected block to Swedish. Keep formatting as clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress'),
+			english: __('Translate the selected block to English. Keep formatting as clean Markdown for WordPress blocks.', 'tornevall-tools-for-wordpress')
+		};
+
+		return prompts[action] || prompts.rephrase;
+	}
+
+	function toolbarControls(runAction, openCustomPrompt) {
+		return [
+			{title: __('Ask AI Assistant', 'tornevall-tools-for-wordpress'), icon: 'admin-comments', onClick: openCustomPrompt},
+			{title: __('Rephrase', 'tornevall-tools-for-wordpress'), icon: 'update', onClick: function () { runAction('rephrase'); }},
+			{title: __('Simplify', 'tornevall-tools-for-wordpress'), icon: 'editor-removeformatting', onClick: function () { runAction('simplify'); }},
+			{title: __('Summarize', 'tornevall-tools-for-wordpress'), icon: 'editor-ol', onClick: function () { runAction('summarize'); }},
+			{title: __('Expand', 'tornevall-tools-for-wordpress'), icon: 'editor-alignleft', onClick: function () { runAction('expand'); }},
+			{title: __('Make shorter', 'tornevall-tools-for-wordpress'), icon: 'editor-contract', onClick: function () { runAction('shorten'); }},
+			{title: __('Make clearer', 'tornevall-tools-for-wordpress'), icon: 'visibility', onClick: function () { runAction('clearer'); }},
+			{title: __('More formal', 'tornevall-tools-for-wordpress'), icon: 'businessperson', onClick: function () { runAction('formal'); }},
+			{title: __('More casual', 'tornevall-tools-for-wordpress'), icon: 'format-chat', onClick: function () { runAction('casual'); }},
+			{title: __('Translate to Swedish', 'tornevall-tools-for-wordpress'), icon: 'translation', onClick: function () { runAction('swedish'); }},
+			{title: __('Translate to English', 'tornevall-tools-for-wordpress'), icon: 'translation', onClick: function () { runAction('english'); }}
+		];
+	}
+
+	function BlockRewriteToolbar(props) {
+		var blockProps = props.blockProps;
+		var isLoadingState = useState(false);
+		var errorState = useState('');
+		var modalState = useState(false);
+		var customPromptState = useState('');
+		var isLoading = isLoadingState[0];
+		var setIsLoading = isLoadingState[1];
+		var error = errorState[0];
+		var setError = errorState[1];
+		var isModalOpen = modalState[0];
+		var setIsModalOpen = modalState[1];
+		var customPrompt = customPromptState[0];
+		var setCustomPrompt = customPromptState[1];
+
+		function replaceCurrentBlockWithAi(prompt) {
+			var source = getRewriteSourceText(blockProps.clientId, blockProps);
+
+			setError('');
+			if (!source) {
+				setError(__('This block has no readable text to rewrite.', 'tornevall-tools-for-wordpress'));
+				return;
+			}
+
+			setIsLoading(true);
+			runAiRequest({
+				provider: settings.defaultProvider || 'tools',
+				prompt: prompt,
+				customText: source,
+				context: 'Inline block toolbar rewrite for block type: ' + blockProps.name,
+				persona: settings.defaultPersona || '',
+				model: defaultModelForProvider(settings.defaultProvider || 'tools'),
+				outputFormat: 'wp_markdown'
+			}).then(function (response) {
+				var blocks = markdownToBlocks(response && response.text ? response.text : '');
+				wp.data.dispatch('core/block-editor').replaceBlocks([blockProps.clientId], blocks);
+			}).catch(function (apiError) {
+				setError(apiError && apiError.message ? apiError.message : __('The block rewrite failed.', 'tornevall-tools-for-wordpress'));
+			}).finally(function () {
+				setIsLoading(false);
+			});
+		}
+
+		function runAction(action) {
+			replaceCurrentBlockWithAi(toolbarActionPrompt(action));
+		}
+
+		function runCustomPrompt() {
+			var prompt = String(customPrompt || '').trim();
+
+			if (!prompt) {
+				setError(__('Write a custom instruction first.', 'tornevall-tools-for-wordpress'));
+				return;
+			}
+
+			setIsModalOpen(false);
+			replaceCurrentBlockWithAi(prompt + '\n\n' + __('Return clean Markdown that can be converted to WordPress blocks.', 'tornevall-tools-for-wordpress'));
+		}
+
+		if (!blockProps || !blockProps.isSelected || !BlockControls || !ToolbarDropdownMenu) {
+			return null;
+		}
+
+		return el(Fragment, {},
+			el(BlockControls, {group: 'other'},
+				el(ToolbarDropdownMenu, {
+					icon: isLoading ? 'update' : 'admin-comments',
+					label: __('Tornevall AI rewrite', 'tornevall-tools-for-wordpress'),
+					text: __('AI', 'tornevall-tools-for-wordpress'),
+					controls: toolbarControls(runAction, function () { setIsModalOpen(true); })
+				})
+			),
+			isModalOpen && Modal ? el(Modal, {
+				title: __('Ask AI Assistant', 'tornevall-tools-for-wordpress'),
+				onRequestClose: function () { setIsModalOpen(false); }
+			},
+				el(TextareaControl, {
+					label: __('Custom rewrite instruction', 'tornevall-tools-for-wordpress'),
+					help: __('The selected block text is sent as source text. This field is only the instruction.', 'tornevall-tools-for-wordpress'),
+					rows: 6,
+					value: customPrompt,
+					onChange: setCustomPrompt
+				}),
+				el('div', {className: 'ttfw-ai-actions'},
+					el(Button, {variant: 'primary', disabled: isLoading, onClick: runCustomPrompt}, __('Rewrite block', 'tornevall-tools-for-wordpress')),
+					el(Button, {variant: 'secondary', onClick: function () { setIsModalOpen(false); }}, __('Cancel', 'tornevall-tools-for-wordpress'))
+				)
+			) : null,
+			error ? el(Notice, {status: 'error', isDismissible: true, onRemove: function () { setError(''); }}, error) : null
+		);
+	}
+
+	function withAiRewriteToolbar(BlockEdit) {
+		return function (props) {
+			return el(Fragment, {},
+				el(BlockEdit, props),
+				el(BlockRewriteToolbar, {blockProps: props})
+			);
+		};
+	}
+
 	function SidebarRender() {
 		var state = useAiState(__('Rewrite the selected block or custom text into clean WordPress-compatible Markdown.', 'tornevall-tools-for-wordpress'));
 		if (!PluginSidebar) {
@@ -489,6 +655,10 @@
 
 	if (PluginSidebar) {
 		registerPlugin('tornevall-tools-ai', {render: SidebarRender});
+	}
+
+	if (addFilter && BlockControls && ToolbarDropdownMenu) {
+		addFilter('editor.BlockEdit', 'tornevall-tools/ai-rewrite-toolbar', withAiRewriteToolbar);
 	}
 
 	registerBlockType('tornevall-tools/ai-assistant', {
