@@ -26,6 +26,45 @@ class TTFW_AI_Service {
 		return 'openai' === $provider ? $this->respond_openai( $payload, $options ) : $this->respond_tools( $payload, $options );
 	}
 
+	/**
+	 * Tests a configured provider token from wp-admin.
+	 *
+	 * @param string $provider Provider key.
+	 * @return array<string,string>|WP_Error
+	 */
+	public function test_provider( $provider ) {
+		$provider = in_array( $provider, array( 'tools', 'openai' ), true ) ? $provider : '';
+		if ( '' === $provider ) {
+			return new WP_Error( 'ttfw_invalid_provider', __( 'Invalid provider.', 'tornevall-tools-for-wordpress' ), array( 'status' => 400 ) );
+		}
+
+		$result = $this->respond(
+			$provider,
+			array(
+				'prompt'            => 'Reply exactly with: ok',
+				'context'           => 'Connection test from Tornevall Tools for WordPress.',
+				'custom_text'       => '',
+				'persona'           => 'You are a connection test endpoint. Reply exactly with: ok',
+				'model'             => '',
+				'response_language' => 'en',
+				'output_format'     => 'plain',
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array(
+			'message' => sprintf(
+				/* translators: 1: provider name, 2: short response text. */
+				__( '%1$s token test succeeded. Provider returned: %2$s', 'tornevall-tools-for-wordpress' ),
+				'tools' === $provider ? __( 'Tools AI', 'tornevall-tools-for-wordpress' ) : __( 'OpenAI', 'tornevall-tools-for-wordpress' ),
+				TTFW_Settings::limit_string( sanitize_text_field( (string) $result['text'] ), 120 )
+			),
+		);
+	}
+
 	private function respond_openai( $payload, $options ) {
 		$token = trim( (string) $options['openai_token'] );
 		$model = ! empty( $payload['model'] ) ? (string) $payload['model'] : (string) $options['openai_model'];
@@ -73,23 +112,18 @@ class TTFW_AI_Service {
 			return new WP_Error( 'ttfw_missing_tools_endpoint', __( 'Tools AI endpoint is not configured.', 'tornevall-tools-for-wordpress' ), array( 'status' => 400 ) );
 		}
 
-		$context = isset( $payload['context'] ) ? (string) $payload['context'] : '';
-		if ( ! empty( $payload['persona'] ) ) {
-			$context = "Persona:\n" . (string) $payload['persona'] . ( '' !== $context ? "\n\nContext:\n" . $context : '' );
-		}
-
 		$body = array(
-			'client_slug'     => (string) $options['tools_client_slug'],
-			'context'         => $context,
-			'user_prompt'     => (string) $payload['prompt'],
-			'client_name'     => 'Tornevall Tools for WordPress',
-			'client_version'  => TTFW_VERSION,
-			'client_platform' => 'wordpress',
+			'client_slug'       => (string) $options['tools_client_slug'],
+			'context'           => $this->build_tools_context( $payload ),
+			'user_prompt'       => (string) $payload['prompt'],
+			'client_name'       => 'Tornevall Tools for WordPress',
+			'client_version'    => TTFW_VERSION,
+			'client_platform'   => 'wordpress',
 			'response_language' => ! empty( $payload['response_language'] ) ? (string) $payload['response_language'] : (string) $options['response_language'],
 		);
 
 		if ( ! empty( $payload['persona'] ) ) {
-			$body['persona_profile_override'] = (string) $payload['persona'];
+			$body['persona_profile_override']    = (string) $payload['persona'];
 			$body['custom_instruction_override'] = (string) $payload['persona'];
 		}
 		if ( ! empty( $payload['model'] ) ) {
@@ -114,9 +148,32 @@ class TTFW_AI_Service {
 	private function build_user_text( $payload ) {
 		$parts = array();
 		if ( ! empty( $payload['context'] ) ) {
-			$parts[] = "Context:\n" . (string) $payload['context'];
+			$parts[] = "Selected WordPress block context:\n" . (string) $payload['context'];
 		}
-		$parts[] = "Task:\n" . (string) $payload['prompt'];
+		if ( ! empty( $payload['custom_text'] ) ) {
+			$parts[] = "Custom text to process:\n" . (string) $payload['custom_text'];
+		}
+		$parts[] = "Instructions:\n" . (string) $payload['prompt'];
+		if ( ! empty( $payload['output_format'] ) && 'wp_markdown' === $payload['output_format'] ) {
+			$parts[] = "Output format:\nReturn clean Markdown that can be converted to WordPress/Gutenberg blocks. Use headings, paragraphs, lists, blockquotes, code blocks, links, and tables only when useful. Do not wrap the full answer in a code fence unless the requested content is code.";
+		}
+		return implode( "\n\n", $parts );
+	}
+
+	private function build_tools_context( $payload ) {
+		$parts = array();
+		if ( ! empty( $payload['persona'] ) ) {
+			$parts[] = "Persona:\n" . (string) $payload['persona'];
+		}
+		if ( ! empty( $payload['context'] ) ) {
+			$parts[] = "Selected WordPress block context:\n" . (string) $payload['context'];
+		}
+		if ( ! empty( $payload['custom_text'] ) ) {
+			$parts[] = "Custom text to process:\n" . (string) $payload['custom_text'];
+		}
+		if ( ! empty( $payload['output_format'] ) && 'wp_markdown' === $payload['output_format'] ) {
+			$parts[] = "Output format:\nReturn clean Markdown that can be converted to WordPress/Gutenberg blocks. Do not wrap the full answer in a code fence unless the requested content is code.";
+		}
 		return implode( "\n\n", $parts );
 	}
 
@@ -154,6 +211,9 @@ class TTFW_AI_Service {
 	private function extract_text( $data, $provider ) {
 		if ( 'tools' === $provider && isset( $data['response'] ) && is_string( $data['response'] ) ) {
 			return trim( $data['response'] );
+		}
+		if ( 'tools' === $provider && isset( $data['text'] ) && is_string( $data['text'] ) ) {
+			return trim( $data['text'] );
 		}
 		if ( isset( $data['output_text'] ) && is_string( $data['output_text'] ) ) {
 			return trim( $data['output_text'] );
