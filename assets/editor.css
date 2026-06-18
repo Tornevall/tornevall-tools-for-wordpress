@@ -1,3 +1,9 @@
+.ttfw-ai-provider-grid {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr);
+}
+
 .ttfw-ai-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -7,6 +13,28 @@
 
 .ttfw-ai-loading {
 	margin: 12px 0;
+}
+
+.ttfw-ai-custom-text {
+	margin-top: 12px;
+}
+
+.ttfw-ai-upload {
+	border: 1px solid #dcdcde;
+	margin: 8px 0 16px;
+	padding: 12px;
+}
+
+.ttfw-ai-upload__label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 8px;
+}
+
+.ttfw-ai-upload__status {
+	display: flex;
+	gap: 8px;
+	margin: 8px 0 0;
 }
 
 .ttfw-ai-result {
@@ -24,6 +52,12 @@
 	width: 100%;
 }
 
+.ttfw-ai-muted {
+	color: #646970;
+	font-size: 12px;
+	margin: 6px 0 0;
+}
+
 .ttfw-ai-block {
 	border: 1px solid #dcdcde;
 	padding: 16px;
@@ -34,4 +68,10 @@
 	border: 1px solid #dcdcde;
 	margin-top: 16px;
 	padding: 12px;
+}
+
+@media (max-width: 782px) {
+	.ttfw-ai-provider-grid {
+		grid-template-columns: 1fr;
+	}
 }
