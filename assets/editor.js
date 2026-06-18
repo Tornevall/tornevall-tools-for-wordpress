@@ -100,23 +100,138 @@
 		return parts.join('\n').trim();
 	}
 
-	function textToParagraphBlocks(text) {
-		var paragraphs = String(text || '').replace(/\r\n/g, '\n').split(/\n{2,}/).map(function (paragraph) {
-			return paragraph.trim();
-		}).filter(Boolean);
+	function inlineMarkdownToHtml(text) {
+		var placeholders = [];
+		var html = escapeHtml(text);
 
-		if (!paragraphs.length) {
-			paragraphs = [String(text || '').trim()];
-		}
-
-		return paragraphs.map(function (paragraph) {
-			return createBlock('core/paragraph', {content: escapeHtml(paragraph).replace(/\n/g, '<br>')});
+		html = html.replace(/`([^`]+)`/g, function (match, code) {
+			var token = '%%TTFW_CODE_' + placeholders.length + '%%';
+			placeholders.push('<code>' + code + '</code>');
+			return token;
 		});
+		html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, function (match, label, url) {
+			return '<a href="' + escapeHtml(url) + '">' + label + '</a>';
+		});
+		html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+		html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+		html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+		html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+		placeholders.forEach(function (value, index) {
+			html = html.replace('%%TTFW_CODE_' + index + '%%', value);
+		});
+		return html;
 	}
 
-	function textToHtml(text) {
-		return textToParagraphBlocks(text).map(function (block) {
-			return '<p>' + block.attributes.content + '</p>';
+	function flushParagraph(buffer, blocks) {
+		if (buffer.length) {
+			blocks.push(createBlock('core/paragraph', {content: inlineMarkdownToHtml(buffer.join(' '))}));
+			buffer.length = 0;
+		}
+	}
+
+	function markdownToBlocks(markdown) {
+		var lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+		var blocks = [];
+		var paragraph = [];
+		var index = 0;
+
+		while (index < lines.length) {
+			var line = lines[index];
+			var trimmed = line.trim();
+			var heading;
+			var listLines;
+			var ordered;
+			var quoteLines;
+			var codeLines;
+
+			if (!trimmed) {
+				flushParagraph(paragraph, blocks);
+				index++;
+				continue;
+			}
+			if (/^```/.test(trimmed)) {
+				flushParagraph(paragraph, blocks);
+				codeLines = [];
+				index++;
+				while (index < lines.length && !/^```/.test(lines[index].trim())) {
+					codeLines.push(lines[index]);
+					index++;
+				}
+				if (index < lines.length) {
+					index++;
+				}
+				blocks.push(createBlock('core/code', {content: escapeHtml(codeLines.join('\n'))}));
+				continue;
+			}
+			if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
+				flushParagraph(paragraph, blocks);
+				blocks.push(createBlock('core/separator'));
+				index++;
+				continue;
+			}
+			heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
+			if (heading) {
+				flushParagraph(paragraph, blocks);
+				blocks.push(createBlock('core/heading', {level: heading[1].length, content: inlineMarkdownToHtml(heading[2])}));
+				index++;
+				continue;
+			}
+			if (/^>\s?/.test(trimmed)) {
+				flushParagraph(paragraph, blocks);
+				quoteLines = [];
+				while (index < lines.length && /^>\s?/.test(lines[index].trim())) {
+					quoteLines.push(lines[index].trim().replace(/^>\s?/, ''));
+					index++;
+				}
+				blocks.push(createBlock('core/quote', {value: '<p>' + inlineMarkdownToHtml(quoteLines.join(' ')) + '</p>'}));
+				continue;
+			}
+			if (/^(?:[-*+]\s+|\d+\.\s+)/.test(trimmed)) {
+				flushParagraph(paragraph, blocks);
+				listLines = [];
+				ordered = /^\d+\.\s+/.test(trimmed);
+				while (index < lines.length && (/^(?:[-*+]\s+|\d+\.\s+)/.test(lines[index].trim()))) {
+					listLines.push(lines[index].trim().replace(/^(?:[-*+]\s+|\d+\.\s+)/, ''));
+					index++;
+				}
+				blocks.push(createBlock('core/list', {
+					ordered: ordered,
+					values: listLines.map(function (item) { return '<li>' + inlineMarkdownToHtml(item) + '</li>'; }).join('')
+				}));
+				continue;
+			}
+			paragraph.push(trimmed);
+			index++;
+		}
+
+		flushParagraph(paragraph, blocks);
+		if (!blocks.length) {
+			blocks.push(createBlock('core/paragraph', {content: inlineMarkdownToHtml(markdown)}));
+		}
+		return blocks;
+	}
+
+	function markdownToHtml(markdown) {
+		return markdownToBlocks(markdown).map(function (block) {
+			if (block.name === 'core/paragraph') {
+				return '<p>' + block.attributes.content + '</p>';
+			}
+			if (block.name === 'core/heading') {
+				return '<h' + block.attributes.level + '>' + block.attributes.content + '</h' + block.attributes.level + '>';
+			}
+			if (block.name === 'core/list') {
+				return (block.attributes.ordered ? '<ol>' : '<ul>') + block.attributes.values + (block.attributes.ordered ? '</ol>' : '</ul>');
+			}
+			if (block.name === 'core/quote') {
+				return '<blockquote>' + block.attributes.value + '</blockquote>';
+			}
+			if (block.name === 'core/code') {
+				return '<pre><code>' + block.attributes.content + '</code></pre>';
+			}
+			if (block.name === 'core/separator') {
+				return '<hr />';
+			}
+			return '';
 		}).join('\n');
 	}
 
@@ -125,11 +240,15 @@
 		return {
 			provider: useState(defaultProvider),
 			prompt: useState(initialPrompt || ''),
+			customText: useState(''),
 			persona: useState(settings.defaultPersona || ''),
 			model: useState(defaultProvider === 'openai' ? (settings.openaiModel || '') : (settings.toolsModel || '')),
 			result: useState(''),
 			error: useState(''),
-			isLoading: useState(false)
+			uploadWarning: useState(''),
+			uploadName: useState(''),
+			isLoading: useState(false),
+			isUploading: useState(false)
 		};
 	}
 
@@ -142,12 +261,10 @@
 
 		setError('');
 		setResult('');
-
 		if (!String(prompt || '').trim()) {
-			setError(__('Write an instruction first.', 'tornevall-tools-for-wordpress'));
+			setError(__('Write instructions first.', 'tornevall-tools-for-wordpress'));
 			return Promise.resolve();
 		}
-
 		setIsLoading(true);
 
 		return apiFetch({
@@ -156,10 +273,12 @@
 			data: {
 				provider: provider,
 				prompt: prompt,
+				custom_text: state.customText[0],
 				context: selectedBlockContext(),
 				persona: state.persona[0],
 				model: state.model[0],
-				response_language: settings.responseLanguage || 'auto'
+				response_language: settings.responseLanguage || 'auto',
+				output_format: 'wp_markdown'
 			}
 		}).then(function (response) {
 			setResult(response && response.text ? response.text : '');
@@ -170,13 +289,42 @@
 		});
 	}
 
+	function uploadDocument(file, state) {
+		var formData;
+		var maxBytes = parseInt(settings.uploadMaxBytes || 0, 10);
+
+		if (!file) {
+			return;
+		}
+		state.error[1]('');
+		state.uploadWarning[1]('');
+		state.uploadName[1]('');
+		if (maxBytes && file.size > maxBytes) {
+			state.error[1](__('The selected document is too large.', 'tornevall-tools-for-wordpress'));
+			return;
+		}
+
+		formData = new window.FormData();
+		formData.append('file', file);
+		state.isUploading[1](true);
+		apiFetch({path: settings.documentEndpoint || '/ttfw/v1/document/extract', method: 'POST', body: formData}).then(function (response) {
+			state.customText[1](response && response.text ? response.text : '');
+			state.uploadName[1](response && response.filename ? response.filename : file.name);
+			state.uploadWarning[1](response && response.warning ? response.warning : '');
+		}).catch(function (error) {
+			state.error[1](error && error.message ? error.message : __('The document could not be read.', 'tornevall-tools-for-wordpress'));
+		}).finally(function () {
+			state.isUploading[1](false);
+		});
+	}
+
 	function ProviderControls(props) {
 		var state = props.state;
 		var provider = state.provider[0];
 		var setProvider = state.provider[1];
 		var setModel = state.model[1];
 
-		return el(Fragment, {},
+		return el('div', {className: 'ttfw-ai-provider-grid'},
 			el(SelectControl, {
 				label: __('Provider', 'tornevall-tools-for-wordpress'),
 				value: provider,
@@ -198,6 +346,34 @@
 		);
 	}
 
+	function CustomTextControls(props) {
+		var state = props.state;
+		var accept = (settings.allowedUploads || ['txt', 'md', 'html', 'docx', 'doc', 'pdf']).map(function (ext) { return '.' + ext; }).join(',');
+		var uploadName = state.uploadName[0];
+		var uploadWarning = state.uploadWarning[0];
+		var isUploading = state.isUploading[0];
+
+		return el('div', {className: 'ttfw-ai-custom-text'},
+			el(TextareaControl, {
+				label: __('Custom text', 'tornevall-tools-for-wordpress'),
+				help: __('Paste text here, or upload a document below. Instructions decide how completely the text should be rewritten.', 'tornevall-tools-for-wordpress'),
+				rows: 10,
+				value: state.customText[0],
+				onChange: state.customText[1]
+			}),
+			el('div', {className: 'ttfw-ai-upload'},
+				el('label', {className: 'ttfw-ai-upload__label'}, __('Upload document for cleanup', 'tornevall-tools-for-wordpress')),
+				el('input', {type: 'file', accept: accept, disabled: isUploading, onChange: function (event) {
+					uploadDocument(event.target.files && event.target.files[0] ? event.target.files[0] : null, state);
+					event.target.value = '';
+				}}),
+				isUploading ? el('span', {className: 'ttfw-ai-upload__status'}, el(Spinner, {}), __('Reading document...', 'tornevall-tools-for-wordpress')) : null,
+				uploadName ? el('p', {className: 'ttfw-ai-upload__status'}, __('Loaded: ', 'tornevall-tools-for-wordpress') + uploadName) : null,
+				uploadWarning ? el(Notice, {status: 'warning', isDismissible: false}, uploadWarning) : null
+			)
+		);
+	}
+
 	function ResultControls(props) {
 		var result = props.result;
 		var allowInsert = result && blockEditor;
@@ -206,8 +382,7 @@
 			var dispatch = wp.data.dispatch('core/block-editor');
 			var select = wp.data.select('core/block-editor');
 			var ids = select.getSelectedBlockClientIds ? select.getSelectedBlockClientIds() : [];
-			var blocks = textToParagraphBlocks(result);
-
+			var blocks = markdownToBlocks(result);
 			if (ids.length) {
 				dispatch.replaceBlocks(ids, blocks);
 				return;
@@ -219,7 +394,7 @@
 			var dispatch = wp.data.dispatch('core/block-editor');
 			var select = wp.data.select('core/block-editor');
 			var ids = select.getSelectedBlockClientIds ? select.getSelectedBlockClientIds() : [];
-			var blocks = textToParagraphBlocks(result);
+			var blocks = markdownToBlocks(result);
 			var lastId;
 			var rootId;
 			var index;
@@ -228,7 +403,6 @@
 				dispatch.insertBlocks(blocks);
 				return;
 			}
-
 			lastId = ids[ids.length - 1];
 			rootId = select.getBlockRootClientId ? select.getBlockRootClientId(lastId) : undefined;
 			index = select.getBlockIndex ? select.getBlockIndex(lastId, rootId) : undefined;
@@ -242,8 +416,9 @@
 		return el('div', {className: 'ttfw-ai-result'},
 			el('h3', {}, __('Result', 'tornevall-tools-for-wordpress')),
 			el('textarea', {className: 'ttfw-ai-result__textarea', readOnly: true, value: result}),
+			el('p', {className: 'ttfw-ai-muted'}, __('Markdown is converted to WordPress-compatible blocks when inserted.', 'tornevall-tools-for-wordpress')),
 			el('div', {className: 'ttfw-ai-actions'},
-				el(Button, {variant: 'primary', disabled: !allowInsert, onClick: insertAfterSelected}, __('Insert after selection', 'tornevall-tools-for-wordpress')),
+				el(Button, {variant: 'primary', disabled: !allowInsert, onClick: insertAfterSelected}, __('Insert as WP blocks', 'tornevall-tools-for-wordpress')),
 				el(Button, {variant: 'secondary', disabled: !allowInsert, onClick: replaceSelected}, __('Replace selection', 'tornevall-tools-for-wordpress'))
 			)
 		);
@@ -258,20 +433,16 @@
 		return el(Fragment, {},
 			el(ProviderControls, {state: state}),
 			el(TextareaControl, {
-				label: __('Instruction', 'tornevall-tools-for-wordpress'),
-				help: __('Selected blocks are sent as context through the server-side proxy.', 'tornevall-tools-for-wordpress'),
+				label: __('Instructions', 'tornevall-tools-for-wordpress'),
+				help: __('Tell AI what to do. Selected blocks and custom text are sent as separate context through the server-side proxy.', 'tornevall-tools-for-wordpress'),
 				rows: 6,
 				value: state.prompt[0],
 				onChange: state.prompt[1]
 			}),
-			el(TextareaControl, {
-				label: __('Persona override', 'tornevall-tools-for-wordpress'),
-				rows: 5,
-				value: state.persona[0],
-				onChange: state.persona[1]
-			}),
+			el(CustomTextControls, {state: state}),
+			el(TextareaControl, {label: __('Persona override', 'tornevall-tools-for-wordpress'), rows: 5, value: state.persona[0], onChange: state.persona[1]}),
 			el('div', {className: 'ttfw-ai-actions'},
-				el(Button, {variant: 'primary', disabled: isLoading, onClick: function () { runAi(state); }}, isLoading ? __('Generating...', 'tornevall-tools-for-wordpress') : __('Generate', 'tornevall-tools-for-wordpress')),
+				el(Button, {variant: 'primary', disabled: isLoading || state.isUploading[0], onClick: function () { runAi(state); }}, isLoading ? __('Generating...', 'tornevall-tools-for-wordpress') : __('Generate', 'tornevall-tools-for-wordpress')),
 				settings.settingsUrl ? el(Button, {variant: 'link', href: settings.settingsUrl, target: '_blank'}, __('Settings', 'tornevall-tools-for-wordpress')) : null
 			),
 			isLoading ? el('div', {className: 'ttfw-ai-loading'}, el(Spinner, {})) : null,
@@ -281,12 +452,10 @@
 	}
 
 	function SidebarRender() {
-		var state = useAiState(__('Improve the selected block content.', 'tornevall-tools-for-wordpress'));
-
+		var state = useAiState(__('Rewrite the selected block or custom text into clean WordPress-compatible Markdown.', 'tornevall-tools-for-wordpress'));
 		if (!PluginSidebar) {
 			return null;
 		}
-
 		return el(Fragment, {},
 			PluginSidebarMoreMenuItem ? el(PluginSidebarMoreMenuItem, {target: 'tornevall-ai-sidebar', icon: 'admin-comments'}, __('Tornevall AI', 'tornevall-tools-for-wordpress')) : null,
 			el(PluginSidebar, {name: 'tornevall-ai-sidebar', title: __('Tornevall AI', 'tornevall-tools-for-wordpress'), icon: 'admin-comments'},
@@ -296,17 +465,16 @@
 	}
 
 	function AssistantBlockEdit(props) {
-		var state = useAiState(__('Write a section for this post.', 'tornevall-tools-for-wordpress'));
+		var state = useAiState(__('Rewrite the custom text into clean WordPress-compatible Markdown.', 'tornevall-tools-for-wordpress'));
 		var result = state.result[0];
-
 		return el('div', {className: 'ttfw-ai-block'},
 			el(Placeholder, {
 				icon: 'admin-comments',
 				label: __('Tornevall AI Assistant', 'tornevall-tools-for-wordpress'),
-				instructions: __('Generate text through Tornevall Tools AI or direct OpenAI. This block is placed in the Text category, next to writing blocks.', 'tornevall-tools-for-wordpress')
+				instructions: __('Generate, rewrite, clean up, or convert text with Tornevall Tools AI or direct OpenAI. Upload documents or paste custom text, then insert the result as WordPress-compatible blocks.', 'tornevall-tools-for-wordpress')
 			},
 				el(AssistantPanel, {state: state}),
-				result ? el(Button, {variant: 'secondary', onClick: function () { props.setAttributes({content: textToHtml(result)}); }}, __('Store result in this block', 'tornevall-tools-for-wordpress')) : null
+				result ? el(Button, {variant: 'secondary', onClick: function () { props.setAttributes({content: markdownToHtml(result)}); }}, __('Store result in this block', 'tornevall-tools-for-wordpress')) : null
 			),
 			props.attributes.content ? el('div', {className: 'ttfw-ai-block__preview', dangerouslySetInnerHTML: {__html: props.attributes.content}}) : null
 		);
@@ -325,7 +493,7 @@
 
 	registerBlockType('tornevall-tools/ai-assistant', {
 		title: __('Tornevall AI Assistant', 'tornevall-tools-for-wordpress'),
-		description: __('Generate editor text with Tornevall Tools AI or direct OpenAI.', 'tornevall-tools-for-wordpress'),
+		description: __('Generate, rewrite, clean up, and convert editor text with Tornevall Tools AI or direct OpenAI.', 'tornevall-tools-for-wordpress'),
 		icon: 'admin-comments',
 		category: 'text',
 		keywords: [__('AI', 'tornevall-tools-for-wordpress'), __('OpenAI', 'tornevall-tools-for-wordpress'), __('Tornevall', 'tornevall-tools-for-wordpress')],
