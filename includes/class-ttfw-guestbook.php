@@ -32,7 +32,10 @@ class TTFW_Guestbook {
 	}
 
 	/**
-	 * Renders a guestbook target and enqueues the matching Tools embed script.
+	 * Renders a guestbook target and, when configured, a local signing form.
+	 *
+	 * The browser posts only to the local WordPress REST endpoint. The Tools
+	 * guestbook API token is added later by PHP and is never exposed here.
 	 *
 	 * @param array<string,mixed> $atts Shortcode attributes.
 	 * @return string
@@ -57,6 +60,7 @@ class TTFW_Guestbook {
 
 		self::$instance++;
 		$target_id = sprintf( 'ttfw-guestbook-%d-%d', self::$instance, wp_rand( 1000, 999999 ) );
+		$form_id   = $target_id . '-form';
 		$embed_url = self::get_embed_url();
 		$script_url = add_query_arg(
 			array(
@@ -75,11 +79,43 @@ class TTFW_Guestbook {
 			true
 		);
 
-		return sprintf(
+		if ( TTFW_Guestbook_API::configured() ) {
+			wp_enqueue_script(
+				'ttfw-guestbook-form',
+				TTFW_URL . 'assets/guestbook.js',
+				array(),
+				TTFW_VERSION,
+				true
+			);
+		}
+
+		$html = sprintf(
 			'<div id="%1$s" class="ttfw-guestbook-embed" data-theme="%2$s"></div>',
 			esc_attr( $target_id ),
 			esc_attr( $theme )
 		);
+
+		if ( ! TTFW_Guestbook_API::configured() ) {
+			return $html;
+		}
+
+		$html .= sprintf(
+			'<form id="%1$s" class="ttfw-guestbook-form" data-ttfw-guestbook-form data-endpoint="%2$s">',
+			esc_attr( $form_id ),
+			esc_url( rest_url( 'ttfw/v1/guestbook/entries' ) )
+		);
+		$html .= '<h3>' . esc_html__( 'Sign the guestbook', 'tornevall-tools-for-wordpress' ) . '</h3>';
+		$html .= '<p><label>' . esc_html__( 'Name', 'tornevall-tools-for-wordpress' ) . '<br><input type="text" name="name" required maxlength="191" autocomplete="name"></label></p>';
+		$html .= '<p><label>' . esc_html__( 'E-mail (not public)', 'tornevall-tools-for-wordpress' ) . '<br><input type="email" name="email" maxlength="254" autocomplete="email"></label></p>';
+		$html .= '<p><label>' . esc_html__( 'Homepage', 'tornevall-tools-for-wordpress' ) . '<br><input type="url" name="homepage" maxlength="2048" placeholder="https://"></label></p>';
+		$html .= '<p><label>' . esc_html__( 'Home city', 'tornevall-tools-for-wordpress' ) . '<br><input type="text" name="homecity" maxlength="191"></label></p>';
+		$html .= '<p><label>' . esc_html__( 'Message', 'tornevall-tools-for-wordpress' ) . '<br><textarea name="message" required maxlength="10000" rows="6"></textarea></label></p>';
+		$html .= '<p style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true"><label>Company<input type="text" name="contact_company" tabindex="-1" autocomplete="off"></label></p>';
+		$html .= '<p><button type="submit">' . esc_html__( 'Sign guestbook', 'tornevall-tools-for-wordpress' ) . '</button></p>';
+		$html .= '<div data-ttfw-guestbook-status role="status" aria-live="polite"></div>';
+		$html .= '</form>';
+
+		return $html;
 	}
 
 	/**
