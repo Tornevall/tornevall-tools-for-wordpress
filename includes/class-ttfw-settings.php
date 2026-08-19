@@ -112,20 +112,15 @@ class TTFW_Settings {
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Tornevall Tools for WordPress', 'tornevall-tools-for-wordpress' ) . '</h1>';
-		echo '<p>' . esc_html__( 'WordPress integrations for selected Tornevall Networks Tools services. A service is contacted only when its integration is configured or explicitly used.', 'tornevall-tools-for-wordpress' ) . '</p>';
+		echo '<p>' . esc_html__( 'A modular bridge between WordPress and Tornevall Networks Tools. Features only contact Tornevall Networks services when you enable and configure them.', 'tornevall-tools-for-wordpress' ) . '</p>';
 		self::render_notice();
 
-		echo '<h2>' . esc_html__( 'Integrations', 'tornevall-tools-for-wordpress' ) . '</h2>';
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Integration', 'tornevall-tools-for-wordpress' ) . '</th><th>' . esc_html__( 'Description', 'tornevall-tools-for-wordpress' ) . '</th><th>' . esc_html__( 'Status', 'tornevall-tools-for-wordpress' ) . '</th></tr></thead><tbody>';
+		echo '<h2>' . esc_html__( 'Modules', 'tornevall-tools-for-wordpress' ) . '</h2>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Module', 'tornevall-tools-for-wordpress' ) . '</th><th>' . esc_html__( 'Description', 'tornevall-tools-for-wordpress' ) . '</th><th>' . esc_html__( 'Status', 'tornevall-tools-for-wordpress' ) . '</th></tr></thead><tbody>';
 		foreach ( TTFW_Module_Registry::all() as $module ) {
 			echo '<tr><td><strong>' . esc_html( $module['name'] ) . '</strong></td><td>' . esc_html( $module['description'] ) . '</td><td>' . esc_html( $module['status'] ) . '</td></tr>';
 		}
 		echo '</tbody></table>';
-
-		echo '<h2>' . esc_html__( 'Guestbook', 'tornevall-tools-for-wordpress' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Embed the public Tornevall Networks Tools guestbook in a post or page with this shortcode:', 'tornevall-tools-for-wordpress' ) . '</p>';
-		echo '<p><code>[tornevall_guestbook]</code></p>';
-		echo '<p>' . esc_html__( 'Optional shortcode attributes are theme (tools, miazma, terminal) and limit (1-50). The Tools guestbook service is contacted only when a visitor opens a page where the shortcode is rendered.', 'tornevall-tools-for-wordpress' ) . '</p>';
 
 		echo '<form action="options.php" method="post">';
 		settings_fields( 'ttfw_settings_group' );
@@ -154,15 +149,15 @@ class TTFW_Settings {
 			echo '<p>' . esc_html__( 'No update has been attempted yet.', 'tornevall-tools-for-wordpress' ) . '</p>';
 		} else {
 			echo '<p><strong>' . esc_html( ! empty( $status['ok'] ) ? __( 'Last update succeeded.', 'tornevall-tools-for-wordpress' ) : __( 'Last update failed.', 'tornevall-tools-for-wordpress' ) ) . '</strong></p>';
-			if ( ! empty( $status['message'] ) ) {
-				echo '<p>' . esc_html( (string) $status['message'] ) . '</p>';
-			}
-			if ( ! empty( $status['address'] ) ) {
-				echo '<p>' . esc_html__( 'Address:', 'tornevall-tools-for-wordpress' ) . ' <code>' . esc_html( (string) $status['address'] ) . '</code></p>';
-			}
-			if ( ! empty( $status['updated_at'] ) ) {
-				echo '<p>' . esc_html__( 'Recorded:', 'tornevall-tools-for-wordpress' ) . ' ' . esc_html( (string) $status['updated_at'] ) . '</p>';
-			}
+		if ( ! empty( $status['message'] ) ) {
+			echo '<p>' . esc_html( (string) $status['message'] ) . '</p>';
+		}
+		if ( ! empty( $status['address'] ) ) {
+			echo '<p>' . esc_html__( 'Address:', 'tornevall-tools-for-wordpress' ) . ' <code>' . esc_html( (string) $status['address'] ) . '</code></p>';
+		}
+		if ( ! empty( $status['updated_at'] ) ) {
+			echo '<p>' . esc_html__( 'Recorded:', 'tornevall-tools-for-wordpress' ) . ' ' . esc_html( (string) $status['updated_at'] ) . '</p>';
+		}
 		}
 
 		if ( ! empty( $options['dyndns_enabled'] ) && '' !== trim( (string) $options['dyndns_hostname'] ) && $has_token ) {

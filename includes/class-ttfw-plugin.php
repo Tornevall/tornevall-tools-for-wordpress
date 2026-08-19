@@ -20,10 +20,13 @@ class TTFW_Plugin {
 	 */
 	public static function init() {
 		TTFW_Settings::init();
-		TTFW_Guestbook::init();
 		TTFW_Dynamic_DNS_Module::init();
+		TTFW_Guestbook_Settings::init();
+		TTFW_Guestbook::init();
+		TTFW_Guestbook_Admin::init();
 
 		add_action( 'plugins_loaded', array( __CLASS__, 'load_textdomain' ) );
+		add_action( 'rest_api_init', array( 'TTFW_Guestbook_REST', 'register_routes' ) );
 	}
 
 	/**

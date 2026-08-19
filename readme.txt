@@ -1,6 +1,6 @@
 === Tornevall Tools for WordPress ===
 Contributors: tornevall
-Tags: tools, guestbook, dynamic-dns, dns, utilities
+Tags: tools, guestbook, dynamic-dns, dns, automation
 Requires at least: 6.5
 Tested up to: 6.5
 Requires PHP: 7.4
@@ -8,149 +8,124 @@ Stable tag: 0.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connect WordPress to Tornevall Networks Tools with Guestbook and Dynamic DNS integrations.
+Connect WordPress to selected Tornevall Networks Tools services, including Guestbook and Dynamic DNS.
 
 == Description ==
 
-Tornevall Tools for WordPress brings selected services from Tornevall Networks Tools into WordPress.
+Tornevall Tools for WordPress is the WordPress integration for selected services provided by Tornevall Networks Tools.
 
-The plugin acts as the WordPress integration layer for Tools. Each supported service is exposed through a WordPress feature suited to that service.
+Version 0.2.0 includes two primary integrations:
 
-The current release includes:
+* Guestbook: display, submit and moderate an owner-scoped Tools Guestbook from WordPress.
+* Dynamic DNS: keep a Tornevall Networks Dynamic DNS hostname updated manually or through WP-Cron.
 
-* Guestbook: embed the public Tornevall Networks Tools guestbook with a shortcode.
-* Dynamic DNS: keep a Tornevall Networks Dynamic DNS hostname updated from your WordPress server.
-* A Tornevall Tools wp-admin overview for the available integrations.
+Service credentials are kept server-side. Integrations only contact external services when their functionality is configured or explicitly used.
 
 = Guestbook =
 
-Embed the public Tools guestbook with:
+Add the Guestbook to a post or page with:
 
 `[tornevall_guestbook]`
 
-Choose a theme and number of entries:
+Optional presentation attributes:
 
 `[tornevall_guestbook theme="miazma" limit="10"]`
 
-Available themes are `tools`, `miazma`, and `terminal`. The `limit` value is restricted to 1-50 entries.
+Supported themes are `tools`, `miazma`, and `terminal`. The entry limit is restricted to 1-50.
 
-The Guestbook service is contacted only on pages where the shortcode is rendered. No Tools API token or other private service credential is required for the public guestbook.
+The Guestbook uses local WordPress JavaScript and local WordPress REST endpoints. WordPress communicates with Tornevall Networks Tools from PHP, which keeps the configured Tools Guestbook token out of browser JavaScript and markup.
+
+Guestbook administration is owner-scoped by the configured Tools token. Public signing can be protected with Cloudflare Turnstile and remains disabled until Turnstile is configured.
+
+The Guestbook can optionally show DNSBL check/report controls when the separate Tornevall Networks DNSBL WordPress plugin is installed, active, and exposes the required bridge capabilities. DNSBL itself is not implemented by this plugin.
 
 = Dynamic DNS =
 
-Dynamic DNS is useful for WordPress installations where the server's public IP address may change and a Tornevall Networks Dynamic DNS hostname should continue pointing to the server.
+The Dynamic DNS integration can keep a configured Tornevall Networks Dynamic DNS hostname synchronized with the public source address seen by Tools.
 
-The module can:
+It supports manual updates and WordPress built-in WP-Cron intervals: hourly, twice daily, or daily.
 
-* Configure a Tornevall Networks Dynamic DNS hostname from wp-admin.
-* Keep the hostname updated automatically through WordPress WP-Cron.
-* Trigger an immediate update manually from wp-admin.
-* Store the Dynamic DNS token server-side.
-* Show the result of the latest update without exposing credentials.
+Dynamic DNS is disabled by default and does not send authenticated requests until an administrator enables it and supplies a hostname and token.
 
-Dynamic DNS is disabled by default. It does not contact Tornevall Networks Tools until an administrator enables it and configures both a hostname and token.
-
-The initial module supports WordPress built-in cron intervals hourly, twice daily, and daily, plus a manual `Update now` action.
-
-= External service =
+= External services =
 
 This plugin integrates with Tornevall Networks Tools at `https://tools.tornevall.net`.
 
-Guestbook service:
+For Guestbook functionality, WordPress may send the configured Guestbook bearer token and Guestbook read/write/moderation data to the Tools Guestbook API. The token is stored server-side and is not sent to public browser JavaScript.
 
-When a visitor opens a page containing `[tornevall_guestbook]`, the visitor's browser loads the public guestbook service from:
-
-`https://tools.tornevall.net/guestbook/embed.js`
-
-The plugin supplies only public presentation parameters such as the selected theme, entry limit, and generated target identifier. The Guestbook integration does not send a Tools API token, Dynamic DNS token, or other private plugin credential. As with a normal web request, Tornevall Networks Tools receives request metadata such as the visitor's IP address and user agent.
-
-Dynamic DNS service:
-
-When Dynamic DNS is enabled, the WordPress server sends the configured Dynamic DNS hostname and server-side bearer token to:
+For Dynamic DNS, WordPress sends the configured Dynamic DNS hostname, bearer token, and `address=auto` to:
 
 `POST https://tools.tornevall.net/api/dyndns/update`
 
-The request uses `address=auto`, which allows Tornevall Networks Tools to use the public source IP address seen for the WordPress server request as the Dynamic DNS address.
+`address=auto` allows Tools to use the public source IP address of the WordPress server request as the Dynamic DNS address.
 
-The Dynamic DNS token is stored in WordPress options and is used only by PHP for server-to-server requests. It is not sent to browser JavaScript.
+Tornevall Networks Tools:
+https://tools.tornevall.net/
 
-Service: https://tools.tornevall.net/
+Dynamic DNS documentation:
+https://tools.tornevall.net/docs/en/dynamic-dns
 
-Dynamic DNS documentation: https://tools.tornevall.net/docs/en/dynamic-dns
+Terms of service:
+https://tools.tornevall.net/docs/en/terms-of-service
 
-Terms of service: https://tools.tornevall.net/docs/en/terms-of-service
+Privacy policy:
+https://tools.tornevall.net/docs/en/privacy-policy
 
-Privacy policy: https://tools.tornevall.net/docs/en/privacy-policy
+= Cloudflare Turnstile =
+
+When public Guestbook signing is enabled, the plugin uses Cloudflare Turnstile. The browser loads the Turnstile challenge and receives the public site key. WordPress sends the returned challenge token and the server-side Turnstile secret to Cloudflare Siteverify for validation before forwarding a Guestbook entry to Tools.
+
+Cloudflare Turnstile documentation:
+https://developers.cloudflare.com/turnstile/
+
+Cloudflare privacy policy:
+https://www.cloudflare.com/privacypolicy/
 
 == Installation ==
 
 1. Upload the plugin directory to `/wp-content/plugins/tornevall-tools-for-wordpress` or install it through WordPress when available in the Plugin Directory.
 2. Activate `Tornevall Tools for WordPress`.
-3. Open `Tornevall Tools` in wp-admin to see the available integrations.
-
-For Guestbook:
-
-1. Add `[tornevall_guestbook]` to a page or post.
-2. Optionally set `theme` and `limit` shortcode attributes.
-
-For Dynamic DNS:
-
-1. Create or select a Dynamic DNS hostname in Tornevall Networks Tools.
-2. Create or rotate your Dynamic DNS token.
-3. Enter the hostname and token in the WordPress settings.
-4. Select an update interval.
-5. Enable Dynamic DNS and save.
-6. Use `Update now` to verify the configuration.
+3. Open `Tornevall Tools` in wp-admin for the integration overview and Dynamic DNS settings.
+4. Open `Tools -> Tools Guestbook` to configure the owner-scoped Guestbook integration.
 
 == Frequently Asked Questions ==
 
 = What is Tornevall Tools for WordPress? =
 
-It is the WordPress integration for selected services provided by Tornevall Networks Tools.
+It is the WordPress client/integration layer for selected Tornevall Networks Tools services.
 
-= Which Tools integrations are included now? =
+= Does it include AI? =
 
-The current release includes the public Tools Guestbook shortcode and Dynamic DNS management.
+AI is not part of the current public release runtime. Earlier AI work is being developed separately and may return later as an optional integration.
 
-= Does the plugin contact Tornevall Networks Tools immediately after activation? =
+= Does it replace the Tornevall DNSBL plugin? =
 
-No. Activation by itself does not make a service request. Guestbook is contacted when a visitor opens a page containing the Guestbook shortcode. Dynamic DNS starts making requests only after an administrator enables and configures it.
+No. DNSBL/FraudBL remains in the separate Tornevall Networks DNSBL WordPress plugin. Guestbook moderation can optionally use its public bridge when that plugin is installed and active.
 
-= Does the Guestbook require a token? =
+= Are Tools tokens exposed in the browser? =
 
-No. The current Guestbook integration uses the public Tools guestbook service and passes only public presentation parameters.
+No. Guestbook and Dynamic DNS credentials are kept server-side and used by PHP for authenticated Tools requests.
 
-= What does the Dynamic DNS module send? =
+= Does Dynamic DNS contact Tools immediately after activation? =
 
-It sends the configured hostname, the Dynamic DNS bearer token, and `address=auto`. Tornevall Networks Tools can therefore see and use the public source IP address of the WordPress server request.
-
-= Is the Dynamic DNS token exposed in the browser? =
-
-No. The token is stored in WordPress options and used by PHP for server-to-server requests.
-
-= How often can Dynamic DNS update? =
-
-The module supports WordPress built-in cron intervals: hourly, twice daily, or daily. Administrators can also run an immediate manual update.
-
-= Does this replace the Tornevall Networks DNSBL plugin? =
-
-No. DNSBL/FraudBL protection remains a separate WordPress plugin and is not duplicated here.
+No. Dynamic DNS is disabled by default.
 
 == Changelog ==
 
 = 0.2.0 =
-* Established Tornevall Tools for WordPress as the WordPress integration for selected Tornevall Networks Tools services.
-* Included the public Tools Guestbook shortcode as a current integration.
-* Added the Tornevall Tools admin dashboard and module foundation.
-* Added a shared server-side Tools API client.
-* Added Dynamic DNS configuration, manual updates, and scheduled WP-Cron updates.
-* Kept Dynamic DNS credentials server-side and documented both current external-service data flows.
-* Removed the earlier AI runtime from the public release line while it remains under separate development.
+* Established the plugin as the WordPress integration for selected Tornevall Networks Tools services.
+* Added the general Tornevall Tools integration overview.
+* Added Dynamic DNS with manual and scheduled WP-Cron updates.
+* Preserved and integrated the owner-scoped Tools Guestbook, local REST proxy and moderation workflow.
+* Added Cloudflare Turnstile support for public Guestbook signing.
+* Preserved optional integration with the separate Tornevall DNSBL plugin without duplicating DNSBL functionality.
+* Removed the AI runtime, AI REST endpoint and AI editor assets from the public release line.
+
+= 0.1.2 =
+* Added owner-scoped Guestbook administration, local API proxying and Turnstile support.
 
 = 0.1.1 =
-* Added public Tornevall Networks Tools Guestbook shortcode.
-* Added Tools, Miazma, and Terminal guestbook themes.
-* Added configurable entry limit for the Guestbook shortcode.
+* Added the first Tools Guestbook shortcode.
 
 = 0.1.0 =
 * Initial development prototype.
