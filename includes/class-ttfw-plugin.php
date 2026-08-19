@@ -46,7 +46,7 @@ class TTFW_Plugin {
 		wp_enqueue_script(
 			'ttfw-editor',
 			TTFW_URL . 'assets/editor.js',
-			array( 'wp-api-fetch', 'wp-block-editor', 'wp-blocks', 'wp-components', 'wp-data', 'wp-edit-post', 'wp-editor', 'wp-element', 'wp-i18n', 'wp-plugins' ),
+			array( 'wp-api-fetch', 'wp-block-editor', 'wp-blocks', 'wp-components', 'wp-data', 'wp-edit-post', 'wp-editor', 'wp-element', 'wp-hooks', 'wp-i18n', 'wp-plugins' ),
 			TTFW_VERSION,
 			true
 		);
@@ -58,12 +58,15 @@ class TTFW_Plugin {
 			'TTFWAI',
 			array(
 				'endpoint'         => '/ttfw/v1/ai/respond',
+				'documentEndpoint' => '/ttfw/v1/document/extract',
 				'settingsUrl'      => admin_url( 'options-general.php?page=' . TTFW_Settings::PAGE_SLUG ),
 				'defaultProvider'  => (string) $options['default_provider'],
 				'defaultPersona'   => (string) $options['default_persona'],
 				'openaiModel'      => (string) $options['openai_model'],
 				'toolsModel'       => (string) $options['tools_model'],
 				'responseLanguage' => (string) $options['response_language'],
+				'allowedUploads'   => array_keys( TTFW_Document_Extractor::allowed_mime_types() ),
+				'uploadMaxBytes'   => TTFW_Document_Extractor::MAX_UPLOAD_BYTES,
 			)
 		);
 	}

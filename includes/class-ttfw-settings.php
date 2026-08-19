@@ -24,7 +24,7 @@ class TTFW_Settings {
 	public static function defaults() {
 		return array(
 			'default_provider'  => 'tools',
-			'default_persona'   => 'You are a precise editorial assistant inside WordPress. Help the editor write, rewrite, summarize, and improve post content. Keep factual uncertainty visible.',
+			'default_persona'   => 'You are a precise editorial assistant inside WordPress. Help the editor write, rewrite, summarize, clean up, and improve post content. Keep factual uncertainty visible. Return clean Markdown that can be converted to WordPress blocks unless the user asks for another format.',
 			'openai_token'      => '',
 			'openai_model'      => 'gpt-4o-mini',
 			'tools_token'       => '',
@@ -54,6 +54,7 @@ class TTFW_Settings {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register' ) );
+		add_action( 'admin_post_ttfw_test_provider', array( __CLASS__, 'handle_provider_test' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( TTFW_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -101,6 +102,35 @@ class TTFW_Settings {
 	}
 
 	/**
+	 * Handles token test requests from wp-admin.
+	 *
+	 * @return void
+	 */
+	public static function handle_provider_test() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You are not allowed to test provider tokens.', 'tornevall-tools-for-wordpress' ) );
+		}
+
+		$provider = isset( $_POST['provider'] ) ? sanitize_key( wp_unslash( $_POST['provider'] ) ) : '';
+		if ( ! in_array( $provider, array( 'tools', 'openai' ), true ) ) {
+			wp_die( esc_html__( 'Invalid provider.', 'tornevall-tools-for-wordpress' ) );
+		}
+
+		check_admin_referer( 'ttfw_test_provider_' . $provider );
+
+		$result  = ( new TTFW_AI_Service() )->test_provider( $provider );
+		$message = array(
+			'ok'       => ! is_wp_error( $result ),
+			'provider' => $provider,
+			'message'  => is_wp_error( $result ) ? $result->get_error_message() : (string) $result['message'],
+		);
+
+		set_transient( self::test_transient_key( $provider ), $message, 60 );
+		wp_safe_redirect( add_query_arg( array( 'page' => self::PAGE_SLUG, 'ttfw_test' => $provider ), admin_url( 'options-general.php' ) ) );
+		exit;
+	}
+
+	/**
 	 * Renders settings page.
 	 *
 	 * @return void
@@ -110,17 +140,18 @@ class TTFW_Settings {
 			return;
 		}
 
-		$options = self::get_options();
+		$options          = self::get_options();
 		$has_openai_token = '' !== (string) $options['openai_token'];
 		$has_tools_token  = '' !== (string) $options['tools_token'];
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Tornevall Tools AI', 'tornevall-tools-for-wordpress' ) . '</h1>';
+		self::render_test_notice();
 		echo '<p>' . esc_html__( 'Configure server-side credentials and defaults for the block editor AI assistant. Tokens are never sent to the browser.', 'tornevall-tools-for-wordpress' ) . '</p>';
 		echo '<form action="options.php" method="post">';
 		settings_fields( 'ttfw_settings_group' );
 		echo '<table class="form-table" role="presentation"><tbody>';
 		self::row_select( 'default_provider', __( 'Default provider', 'tornevall-tools-for-wordpress' ), $options['default_provider'], array( 'tools' => __( 'Tornevall Tools AI', 'tornevall-tools-for-wordpress' ), 'openai' => __( 'OpenAI direct', 'tornevall-tools-for-wordpress' ) ) );
-		self::row_textarea( 'default_persona', __( 'Default persona', 'tornevall-tools-for-wordpress' ), $options['default_persona'], __( 'Used as server-side default persona for both providers.', 'tornevall-tools-for-wordpress' ) );
+		self::row_textarea( 'default_persona', __( 'Default persona', 'tornevall-tools-for-wordpress' ), $options['default_persona'], __( 'Used as server-side default persona for both providers. The editor can still provide an override per request.', 'tornevall-tools-for-wordpress' ) );
 		self::row_secret( 'openai_token', __( 'OpenAI API token', 'tornevall-tools-for-wordpress' ), $has_openai_token, __( 'Direct OpenAI API key. Leave blank to keep the stored token.', 'tornevall-tools-for-wordpress' ) );
 		self::row_text( 'openai_model', __( 'OpenAI model', 'tornevall-tools-for-wordpress' ), $options['openai_model'], __( 'Model used for direct OpenAI requests.', 'tornevall-tools-for-wordpress' ) );
 		self::row_secret( 'tools_token', __( 'Tools AI token', 'tornevall-tools-for-wordpress' ), $has_tools_token, __( 'Bearer token for Tools AI. The internal endpoint requires the correct AI scope.', 'tornevall-tools-for-wordpress' ) );
@@ -131,7 +162,9 @@ class TTFW_Settings {
 		self::row_number( 'timeout', __( 'HTTP timeout', 'tornevall-tools-for-wordpress' ), (int) $options['timeout'] );
 		echo '</tbody></table>';
 		submit_button();
-		echo '</form></div>';
+		echo '</form>';
+		self::render_provider_test_panel();
+		echo '</div>';
 	}
 
 	/**
@@ -155,34 +188,101 @@ class TTFW_Settings {
 		$output['tools_model']      = self::sanitize_identifier( self::scalar( $input, 'tools_model', '' ), 80 );
 
 		$url = esc_url_raw( self::scalar( $input, 'tools_api_url', $defaults['tools_api_url'] ) );
-		$output['tools_api_url'] = self::is_https_url( $url ) ? $url : $defaults['tools_api_url'];
+		$output['tools_api_url']    = self::is_https_url( $url ) ? $url : $defaults['tools_api_url'];
 		$output['tools_client_slug'] = self::sanitize_slug( self::scalar( $input, 'tools_client_slug', $defaults['tools_client_slug'] ) );
 
 		$language = sanitize_key( self::scalar( $input, 'response_language', $defaults['response_language'] ) );
 		$output['response_language'] = in_array( $language, array( 'auto', 'sv', 'en', 'da', 'no', 'de', 'fr', 'es' ), true ) ? $language : $defaults['response_language'];
-		$output['timeout'] = max( 5, min( 120, absint( self::scalar( $input, 'timeout', $defaults['timeout'] ) ) ) );
+		$output['timeout']           = max( 5, min( 120, absint( self::scalar( $input, 'timeout', $defaults['timeout'] ) ) ) );
 
 		return $output;
 	}
 
+	/**
+	 * Sanitizes longer textarea content.
+	 *
+	 * @param mixed $value Raw value.
+	 * @param int   $max_length Maximum length.
+	 * @return string
+	 */
 	public static function sanitize_long_text( $value, $max_length ) {
 		return self::limit_string( sanitize_textarea_field( (string) $value ), $max_length );
 	}
 
+	/**
+	 * Sanitizes provider model identifiers.
+	 *
+	 * @param mixed $value Raw value.
+	 * @param int   $max_length Maximum length.
+	 * @return string
+	 */
 	public static function sanitize_identifier( $value, $max_length = 120 ) {
 		$value = preg_replace( '/[^A-Za-z0-9_.:\/-]/', '', sanitize_text_field( (string) $value ) );
 		return self::limit_string( (string) $value, $max_length );
 	}
 
+	/**
+	 * Sanitizes a Tools client slug.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
 	public static function sanitize_slug( $value ) {
 		$value = strtolower( self::sanitize_identifier( $value, 80 ) );
 		$value = trim( (string) preg_replace( '/[^a-z0-9_\-]/', '_', $value ), '_-' );
 		return '' === $value ? self::defaults()['tools_client_slug'] : $value;
 	}
 
+	/**
+	 * Limits a string while supporting mbstring when available.
+	 *
+	 * @param mixed $value Raw value.
+	 * @param int   $max_length Maximum length.
+	 * @return string
+	 */
 	public static function limit_string( $value, $max_length ) {
 		$value = (string) $value;
 		return function_exists( 'mb_substr' ) ? mb_substr( $value, 0, $max_length ) : substr( $value, 0, $max_length );
+	}
+
+	private static function render_test_notice() {
+		$provider = isset( $_GET['ttfw_test'] ) ? sanitize_key( wp_unslash( $_GET['ttfw_test'] ) ) : '';
+		if ( ! in_array( $provider, array( 'tools', 'openai' ), true ) ) {
+			return;
+		}
+
+		$result = get_transient( self::test_transient_key( $provider ) );
+		delete_transient( self::test_transient_key( $provider ) );
+
+		if ( ! is_array( $result ) || ! isset( $result['message'] ) ) {
+			return;
+		}
+
+		$class = ! empty( $result['ok'] ) ? 'notice notice-success is-dismissible' : 'notice notice-error is-dismissible';
+		echo '<div class="' . esc_attr( $class ) . '"><p>' . esc_html( (string) $result['message'] ) . '</p></div>';
+	}
+
+	private static function render_provider_test_panel() {
+		echo '<hr />';
+		echo '<h2>' . esc_html__( 'Test provider tokens', 'tornevall-tools-for-wordpress' ) . '</h2>';
+		echo '<p>' . esc_html__( 'These tests use the currently saved settings. Save changes before testing new tokens.', 'tornevall-tools-for-wordpress' ) . '</p>';
+		echo '<div class="ttfw-admin-test-actions" style="display:flex;gap:12px;flex-wrap:wrap;">';
+		self::render_provider_test_form( 'tools', __( 'Test Tools AI token', 'tornevall-tools-for-wordpress' ) );
+		self::render_provider_test_form( 'openai', __( 'Test OpenAI token', 'tornevall-tools-for-wordpress' ) );
+		echo '</div>';
+	}
+
+	private static function render_provider_test_form( $provider, $label ) {
+		echo '<form action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" method="post">';
+		echo '<input type="hidden" name="action" value="ttfw_test_provider" />';
+		echo '<input type="hidden" name="provider" value="' . esc_attr( $provider ) . '" />';
+		wp_nonce_field( 'ttfw_test_provider_' . $provider );
+		submit_button( $label, 'secondary', 'submit', false );
+		echo '</form>';
+	}
+
+	private static function test_transient_key( $provider ) {
+		return 'ttfw_test_' . get_current_user_id() . '_' . sanitize_key( $provider );
 	}
 
 	private static function sanitize_secret( $input, $key, $current ) {
