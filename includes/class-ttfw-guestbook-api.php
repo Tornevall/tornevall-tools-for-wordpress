@@ -16,8 +16,7 @@ class TTFW_Guestbook_API {
 	 * @return string
 	 */
 	public static function api_url() {
-		$options = TTFW_Settings::get_options();
-		$url     = isset( $options['guestbook_api_url'] ) ? esc_url_raw( (string) $options['guestbook_api_url'] ) : '';
+		$url = esc_url_raw( TTFW_Guestbook_Settings::api_url() );
 
 		if ( ! wp_http_validate_url( $url ) || 'https' !== strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) ) ) {
 			return self::DEFAULT_API_URL;
@@ -30,8 +29,7 @@ class TTFW_Guestbook_API {
 	 * @return bool
 	 */
 	public static function configured() {
-		$options = TTFW_Settings::get_options();
-		return '' !== trim( (string) ( $options['guestbook_token'] ?? '' ) );
+		return '' !== trim( TTFW_Guestbook_Settings::token() );
 	}
 
 	/**
@@ -74,8 +72,7 @@ class TTFW_Guestbook_API {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	private function request( $method, $path, $payload = array() ) {
-		$options = TTFW_Settings::get_options();
-		$token   = trim( (string) ( $options['guestbook_token'] ?? '' ) );
+		$token = trim( TTFW_Guestbook_Settings::token() );
 		if ( '' === $token ) {
 			return new WP_Error(
 				'ttfw_guestbook_not_configured',
@@ -87,7 +84,7 @@ class TTFW_Guestbook_API {
 		$url  = self::api_url() . '/' . ltrim( $path, '/' );
 		$args = array(
 			'method'  => strtoupper( (string) $method ),
-			'timeout' => max( 5, min( 120, absint( $options['timeout'] ?? 60 ) ) ),
+			'timeout' => 60,
 			'headers' => array(
 				'Accept'        => 'application/json',
 				'Authorization' => 'Bearer ' . $token,
