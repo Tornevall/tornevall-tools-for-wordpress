@@ -21,6 +21,12 @@ Tools remains the authoritative Guestbook database.
 
 Public pages use the local WordPress Guestbook JavaScript and local REST endpoints. WordPress forwards requests to Tools from PHP so the Tools Guestbook token never needs to enter browser JavaScript or markup.
 
+The default Tools Guestbook API base is:
+
+```text
+https://tools.tornevall.net/api/guestbook
+```
+
 Basic shortcode:
 
 ```text
@@ -75,6 +81,7 @@ Administrators can also run an immediate `Update now` request from wp-admin.
 Tools is used for the Guestbook and Dynamic DNS integrations.
 
 - Service: https://tools.tornevall.net/
+- Guestbook API: https://tools.tornevall.net/api/guestbook
 - Dynamic DNS documentation: https://tools.tornevall.net/docs/en/dynamic-dns
 - Terms: https://tools.tornevall.net/docs/en/terms-of-service
 - Privacy: https://tools.tornevall.net/docs/en/privacy-policy
@@ -83,7 +90,26 @@ Guestbook and Dynamic DNS credentials are stored in WordPress and used by PHP fo
 
 ### Cloudflare Turnstile
 
-The Guestbook can use Cloudflare Turnstile to protect public signing. The browser receives the public site key and challenge widget; the Turnstile secret remains server-side and is used by WordPress for Siteverify validation.
+The Guestbook can use Cloudflare Turnstile to protect public signing.
+
+When configured, the visitor's browser loads the Turnstile widget script from:
+
+```text
+https://challenges.cloudflare.com/turnstile/v0/api.js
+```
+
+The public site key and challenge run in the browser. WordPress validates the returned challenge token server-side at:
+
+```text
+POST https://challenges.cloudflare.com/turnstile/v0/siteverify
+```
+
+The Turnstile secret remains server-side.
+
+- Documentation: https://developers.cloudflare.com/turnstile/
+- Terms: https://www.cloudflare.com/policies/terms/
+- Privacy: https://www.cloudflare.com/policies/privacy/
+- Turnstile Privacy Addendum: https://www.cloudflare.com/turnstile-privacy-policy/
 
 ## Requirements
 
