@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin settings.
+ * Admin settings and module overview.
  *
  * @package TornevallToolsForWordPress
  */
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class TTFW_Settings {
 	public const OPTION_NAME = 'ttfw_options';
-	public const PAGE_SLUG   = 'tornevall-tools-ai';
+	public const PAGE_SLUG   = 'tornevall-tools';
 
 	/**
 	 * Returns default options.
@@ -23,16 +23,10 @@ class TTFW_Settings {
 	 */
 	public static function defaults() {
 		return array(
-			'default_provider'  => 'tools',
-			'default_persona'   => 'You are a precise editorial assistant inside WordPress. Help the editor write, rewrite, summarize, and improve post content. Keep factual uncertainty visible.',
-			'openai_token'      => '',
-			'openai_model'      => 'gpt-4o-mini',
-			'tools_token'       => '',
-			'tools_api_url'     => 'https://tools.tornevall.net/api/ai/internal/respond',
-			'tools_client_slug' => 'tornevall_tools_wordpress',
-			'tools_model'       => '',
-			'response_language' => 'auto',
-			'timeout'           => 60,
+			'dyndns_enabled'  => false,
+			'dyndns_hostname' => '',
+			'dyndns_token'    => '',
+			'dyndns_schedule' => 'hourly',
 		);
 	}
 
@@ -64,27 +58,29 @@ class TTFW_Settings {
 	 * @return array<int,string>
 	 */
 	public static function action_links( $links ) {
-		array_unshift( $links, '<a href="' . esc_url( admin_url( 'options-general.php?page=' . self::PAGE_SLUG ) ) . '">' . esc_html__( 'Settings', 'tornevall-tools-for-wordpress' ) . '</a>' );
+		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ) . '">' . esc_html__( 'Settings', 'tornevall-tools-for-wordpress' ) . '</a>' );
 		return $links;
 	}
 
 	/**
-	 * Adds admin page.
+	 * Adds the top-level Tools admin page.
 	 *
 	 * @return void
 	 */
 	public static function add_page() {
-		add_options_page(
-			esc_html__( 'Tornevall Tools AI', 'tornevall-tools-for-wordpress' ),
-			esc_html__( 'Tornevall Tools AI', 'tornevall-tools-for-wordpress' ),
+		add_menu_page(
+			esc_html__( 'Tornevall Tools', 'tornevall-tools-for-wordpress' ),
+			esc_html__( 'Tornevall Tools', 'tornevall-tools-for-wordpress' ),
 			'manage_options',
 			self::PAGE_SLUG,
-			array( __CLASS__, 'render_page' )
+			array( __CLASS__, 'render_page' ),
+			'dashicons-admin-tools',
+			80
 		);
 	}
 
 	/**
-	 * Registers settings.
+	 * Registers plugin settings.
 	 *
 	 * @return void
 	 */
@@ -101,7 +97,7 @@ class TTFW_Settings {
 	}
 
 	/**
-	 * Renders settings page.
+	 * Renders the plugin dashboard and settings.
 	 *
 	 * @return void
 	 */
@@ -110,28 +106,73 @@ class TTFW_Settings {
 			return;
 		}
 
-		$options = self::get_options();
-		$has_openai_token = '' !== (string) $options['openai_token'];
-		$has_tools_token  = '' !== (string) $options['tools_token'];
+		$options   = self::get_options();
+		$has_token = '' !== (string) $options['dyndns_token'];
+		$status    = TTFW_Dynamic_DNS_Module::get_status();
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'Tornevall Tools AI', 'tornevall-tools-for-wordpress' ) . '</h1>';
-		echo '<p>' . esc_html__( 'Configure server-side credentials and defaults for the block editor AI assistant. Tokens are never sent to the browser.', 'tornevall-tools-for-wordpress' ) . '</p>';
+		echo '<div class="wrap">';
+		echo '<h1>' . esc_html__( 'Tornevall Tools for WordPress', 'tornevall-tools-for-wordpress' ) . '</h1>';
+		echo '<p>' . esc_html__( 'A modular bridge between WordPress and Tornevall Networks Tools. Features only contact Tornevall Networks services when you enable and configure them.', 'tornevall-tools-for-wordpress' ) . '</p>';
+		self::render_notice();
+
+		echo '<h2>' . esc_html__( 'Modules', 'tornevall-tools-for-wordpress' ) . '</h2>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Module', 'tornevall-tools-for-wordpress' ) . '</th><th>' . esc_html__( 'Description', 'tornevall-tools-for-wordpress' ) . '</th><th>' . esc_html__( 'Status', 'tornevall-tools-for-wordpress' ) . '</th></tr></thead><tbody>';
+		foreach ( TTFW_Module_Registry::all() as $module ) {
+			echo '<tr><td><strong>' . esc_html( $module['name'] ) . '</strong></td><td>' . esc_html( $module['description'] ) . '</td><td>' . esc_html( $module['status'] ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+
 		echo '<form action="options.php" method="post">';
 		settings_fields( 'ttfw_settings_group' );
+		echo '<h2>' . esc_html__( 'Dynamic DNS', 'tornevall-tools-for-wordpress' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Keep one hostname from the Tornevall Networks Dynamic DNS service updated with the public source address seen by Tools.', 'tornevall-tools-for-wordpress' ) . '</p>';
 		echo '<table class="form-table" role="presentation"><tbody>';
-		self::row_select( 'default_provider', __( 'Default provider', 'tornevall-tools-for-wordpress' ), $options['default_provider'], array( 'tools' => __( 'Tornevall Tools AI', 'tornevall-tools-for-wordpress' ), 'openai' => __( 'OpenAI direct', 'tornevall-tools-for-wordpress' ) ) );
-		self::row_textarea( 'default_persona', __( 'Default persona', 'tornevall-tools-for-wordpress' ), $options['default_persona'], __( 'Used as server-side default persona for both providers.', 'tornevall-tools-for-wordpress' ) );
-		self::row_secret( 'openai_token', __( 'OpenAI API token', 'tornevall-tools-for-wordpress' ), $has_openai_token, __( 'Direct OpenAI API key. Leave blank to keep the stored token.', 'tornevall-tools-for-wordpress' ) );
-		self::row_text( 'openai_model', __( 'OpenAI model', 'tornevall-tools-for-wordpress' ), $options['openai_model'], __( 'Model used for direct OpenAI requests.', 'tornevall-tools-for-wordpress' ) );
-		self::row_secret( 'tools_token', __( 'Tools AI token', 'tornevall-tools-for-wordpress' ), $has_tools_token, __( 'Bearer token for Tools AI. The internal endpoint requires the correct AI scope.', 'tornevall-tools-for-wordpress' ) );
-		self::row_text( 'tools_api_url', __( 'Tools AI endpoint', 'tornevall-tools-for-wordpress' ), $options['tools_api_url'], __( 'Default: https://tools.tornevall.net/api/ai/internal/respond', 'tornevall-tools-for-wordpress' ) );
-		self::row_text( 'tools_client_slug', __( 'Tools client slug', 'tornevall-tools-for-wordpress' ), $options['tools_client_slug'], __( 'Stable Tools-side client identifier for auditing and defaults.', 'tornevall-tools-for-wordpress' ) );
-		self::row_text( 'tools_model', __( 'Tools model override', 'tornevall-tools-for-wordpress' ), $options['tools_model'], __( 'Optional. Leave blank to use the Tools-side default for the client slug.', 'tornevall-tools-for-wordpress' ) );
-		self::row_select( 'response_language', __( 'Response language', 'tornevall-tools-for-wordpress' ), $options['response_language'], array( 'auto' => 'Auto', 'sv' => 'Swedish', 'en' => 'English', 'da' => 'Danish', 'no' => 'Norwegian', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish' ) );
-		self::row_number( 'timeout', __( 'HTTP timeout', 'tornevall-tools-for-wordpress' ), (int) $options['timeout'] );
+		self::row_checkbox( 'dyndns_enabled', __( 'Enable Dynamic DNS', 'tornevall-tools-for-wordpress' ), ! empty( $options['dyndns_enabled'] ), __( 'When enabled, WordPress schedules updates using WP-Cron.', 'tornevall-tools-for-wordpress' ) );
+		self::row_text( 'dyndns_hostname', __( 'Hostname', 'tornevall-tools-for-wordpress' ), $options['dyndns_hostname'], __( 'A Dynamic DNS hostname owned by the configured token, for example home.dyn.tornevall.net.', 'tornevall-tools-for-wordpress' ) );
+		self::row_secret( 'dyndns_token', __( 'Dynamic DNS token', 'tornevall-tools-for-wordpress' ), $has_token, __( 'Create or rotate this token in the Tornevall Networks Tools Dynamic DNS service. Leave blank to keep the stored token.', 'tornevall-tools-for-wordpress' ) );
+		self::row_select(
+			'dyndns_schedule',
+			__( 'Update interval', 'tornevall-tools-for-wordpress' ),
+			$options['dyndns_schedule'],
+			array(
+				'hourly'     => __( 'Hourly', 'tornevall-tools-for-wordpress' ),
+				'twicedaily' => __( 'Twice daily', 'tornevall-tools-for-wordpress' ),
+				'daily'      => __( 'Daily', 'tornevall-tools-for-wordpress' ),
+			)
+		);
 		echo '</tbody></table>';
 		submit_button();
-		echo '</form></div>';
+		echo '</form>';
+
+		echo '<h3>' . esc_html__( 'Dynamic DNS status', 'tornevall-tools-for-wordpress' ) . '</h3>';
+		if ( empty( $status ) ) {
+			echo '<p>' . esc_html__( 'No update has been attempted yet.', 'tornevall-tools-for-wordpress' ) . '</p>';
+		} else {
+			echo '<p><strong>' . esc_html( ! empty( $status['ok'] ) ? __( 'Last update succeeded.', 'tornevall-tools-for-wordpress' ) : __( 'Last update failed.', 'tornevall-tools-for-wordpress' ) ) . '</strong></p>';
+		if ( ! empty( $status['message'] ) ) {
+			echo '<p>' . esc_html( (string) $status['message'] ) . '</p>';
+		}
+		if ( ! empty( $status['address'] ) ) {
+			echo '<p>' . esc_html__( 'Address:', 'tornevall-tools-for-wordpress' ) . ' <code>' . esc_html( (string) $status['address'] ) . '</code></p>';
+		}
+		if ( ! empty( $status['updated_at'] ) ) {
+			echo '<p>' . esc_html__( 'Recorded:', 'tornevall-tools-for-wordpress' ) . ' ' . esc_html( (string) $status['updated_at'] ) . '</p>';
+		}
+		}
+
+		if ( ! empty( $options['dyndns_enabled'] ) && '' !== trim( (string) $options['dyndns_hostname'] ) && $has_token ) {
+			echo '<form action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" method="post">';
+			echo '<input type="hidden" name="action" value="ttfw_dyndns_update_now" />';
+			wp_nonce_field( 'ttfw_dyndns_update_now' );
+			submit_button( __( 'Update now', 'tornevall-tools-for-wordpress' ), 'secondary', 'submit', false );
+			echo '</form>';
+		}
+
+		echo '<hr />';
+		echo '<p>' . esc_html__( 'External service:', 'tornevall-tools-for-wordpress' ) . ' <a href="' . esc_url( 'https://tools.tornevall.net/' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Tornevall Networks Tools', 'tornevall-tools-for-wordpress' ) . '</a>. ';
+		echo '<a href="' . esc_url( 'https://tools.tornevall.net/docs/en/terms-of-service' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Terms', 'tornevall-tools-for-wordpress' ) . '</a> - ';
+		echo '<a href="' . esc_url( 'https://tools.tornevall.net/docs/en/privacy-policy' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Privacy', 'tornevall-tools-for-wordpress' ) . '</a>.</p>';
+		echo '</div>';
 	}
 
 	/**
@@ -143,48 +184,74 @@ class TTFW_Settings {
 	public static function sanitize_options( $input ) {
 		$current  = self::get_options();
 		$defaults = self::defaults();
-		$output   = $current;
 		$input    = is_array( $input ) ? $input : array();
+		$output   = $defaults;
 
-		$provider = sanitize_key( self::scalar( $input, 'default_provider', $defaults['default_provider'] ) );
-		$output['default_provider'] = in_array( $provider, array( 'tools', 'openai' ), true ) ? $provider : $defaults['default_provider'];
-		$output['default_persona']  = self::sanitize_long_text( self::scalar( $input, 'default_persona', $defaults['default_persona'] ), 6000 );
-		$output['openai_token']     = self::sanitize_secret( $input, 'openai_token', $current['openai_token'] );
-		$output['tools_token']      = self::sanitize_secret( $input, 'tools_token', $current['tools_token'] );
-		$output['openai_model']     = self::sanitize_identifier( self::scalar( $input, 'openai_model', $defaults['openai_model'] ), 80 );
-		$output['tools_model']      = self::sanitize_identifier( self::scalar( $input, 'tools_model', '' ), 80 );
+		$output['dyndns_enabled']  = isset( $input['dyndns_enabled'] ) && '1' === (string) $input['dyndns_enabled'];
+		$output['dyndns_hostname'] = self::sanitize_hostname( self::scalar( $input, 'dyndns_hostname', '' ) );
+		$output['dyndns_token']    = self::sanitize_secret( $input, 'dyndns_token', $current['dyndns_token'] );
 
-		$url = esc_url_raw( self::scalar( $input, 'tools_api_url', $defaults['tools_api_url'] ) );
-		$output['tools_api_url'] = self::is_https_url( $url ) ? $url : $defaults['tools_api_url'];
-		$output['tools_client_slug'] = self::sanitize_slug( self::scalar( $input, 'tools_client_slug', $defaults['tools_client_slug'] ) );
-
-		$language = sanitize_key( self::scalar( $input, 'response_language', $defaults['response_language'] ) );
-		$output['response_language'] = in_array( $language, array( 'auto', 'sv', 'en', 'da', 'no', 'de', 'fr', 'es' ), true ) ? $language : $defaults['response_language'];
-		$output['timeout'] = max( 5, min( 120, absint( self::scalar( $input, 'timeout', $defaults['timeout'] ) ) ) );
+		$schedule = sanitize_key( self::scalar( $input, 'dyndns_schedule', $defaults['dyndns_schedule'] ) );
+		$output['dyndns_schedule'] = in_array( $schedule, array( 'hourly', 'twicedaily', 'daily' ), true ) ? $schedule : $defaults['dyndns_schedule'];
 
 		return $output;
 	}
 
-	public static function sanitize_long_text( $value, $max_length ) {
-		return self::limit_string( sanitize_textarea_field( (string) $value ), $max_length );
+	/**
+	 * Sanitizes a DNS hostname.
+	 *
+	 * @param mixed $value Raw hostname.
+	 * @return string
+	 */
+	public static function sanitize_hostname( $value ) {
+		$value = strtolower( trim( sanitize_text_field( (string) $value ), ". \t\n\r\0\x0B" ) );
+		if ( '' === $value ) {
+			return '';
+		}
+		if ( strlen( $value ) > 253 || ! preg_match( '/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $value ) ) {
+			add_settings_error( self::OPTION_NAME, 'ttfw_invalid_dyndns_hostname', __( 'The Dynamic DNS hostname is not valid.', 'tornevall-tools-for-wordpress' ) );
+			return '';
+		}
+		return $value;
 	}
 
-	public static function sanitize_identifier( $value, $max_length = 120 ) {
-		$value = preg_replace( '/[^A-Za-z0-9_.:\/-]/', '', sanitize_text_field( (string) $value ) );
-		return self::limit_string( (string) $value, $max_length );
-	}
-
-	public static function sanitize_slug( $value ) {
-		$value = strtolower( self::sanitize_identifier( $value, 80 ) );
-		$value = trim( (string) preg_replace( '/[^a-z0-9_\-]/', '_', $value ), '_-' );
-		return '' === $value ? self::defaults()['tools_client_slug'] : $value;
-	}
-
+	/**
+	 * Limits a string while supporting mbstring when available.
+	 *
+	 * @param mixed $value Raw value.
+	 * @param int   $max_length Maximum length.
+	 * @return string
+	 */
 	public static function limit_string( $value, $max_length ) {
 		$value = (string) $value;
 		return function_exists( 'mb_substr' ) ? mb_substr( $value, 0, $max_length ) : substr( $value, 0, $max_length );
 	}
 
+	/**
+	 * Displays a result notice after a manual update.
+	 *
+	 * @return void
+	 */
+	private static function render_notice() {
+		$notice = isset( $_GET['ttfw_notice'] ) ? sanitize_key( wp_unslash( $_GET['ttfw_notice'] ) ) : '';
+		if ( ! in_array( $notice, array( 'dyndns_updated', 'dyndns_error' ), true ) ) {
+			return;
+		}
+
+		$status  = TTFW_Dynamic_DNS_Module::get_status();
+		$is_ok   = 'dyndns_updated' === $notice;
+		$message = ! empty( $status['message'] ) ? (string) $status['message'] : ( $is_ok ? __( 'Dynamic DNS was updated.', 'tornevall-tools-for-wordpress' ) : __( 'Dynamic DNS update failed.', 'tornevall-tools-for-wordpress' ) );
+		echo '<div class="notice ' . esc_attr( $is_ok ? 'notice-success' : 'notice-error' ) . ' is-dismissible"><p>' . esc_html( $message ) . '</p></div>';
+	}
+
+	/**
+	 * Sanitizes a secret while preserving an existing value on blank submission.
+	 *
+	 * @param array<string,mixed> $input Input array.
+	 * @param string              $key Option key.
+	 * @param mixed               $current Current value.
+	 * @return string
+	 */
 	private static function sanitize_secret( $input, $key, $current ) {
 		if ( ! array_key_exists( $key, $input ) ) {
 			return (string) $current;
@@ -193,6 +260,14 @@ class TTFW_Settings {
 		return '' === $value ? (string) $current : self::limit_string( $value, 4000 );
 	}
 
+	/**
+	 * Gets one scalar option input safely.
+	 *
+	 * @param array<string,mixed> $input Input array.
+	 * @param string              $key Option key.
+	 * @param mixed               $default Default value.
+	 * @return string
+	 */
 	private static function scalar( $input, $key, $default ) {
 		if ( ! is_array( $input ) || ! array_key_exists( $key, $input ) || is_array( $input[ $key ] ) || is_object( $input[ $key ] ) ) {
 			return (string) $default;
@@ -200,11 +275,12 @@ class TTFW_Settings {
 		return (string) wp_unslash( $input[ $key ] );
 	}
 
-	private static function is_https_url( $url ) {
-		$parts = wp_parse_url( $url );
-		return is_array( $parts ) && isset( $parts['scheme'], $parts['host'] ) && 'https' === strtolower( (string) $parts['scheme'] );
-	}
-
+	/**
+	 * Builds a WordPress settings field name.
+	 *
+	 * @param string $key Option key.
+	 * @return string
+	 */
 	private static function field_name( $key ) {
 		return self::OPTION_NAME . '[' . $key . ']';
 	}
@@ -218,8 +294,8 @@ class TTFW_Settings {
 		echo '<tr><th scope="row"><label for="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td><input id="' . esc_attr( $key ) . '" type="password" class="regular-text" autocomplete="new-password" placeholder="' . esc_attr( $placeholder ) . '" name="' . esc_attr( self::field_name( $key ) ) . '" value="" /><p class="description">' . esc_html( $description ) . '</p></td></tr>';
 	}
 
-	private static function row_textarea( $key, $label, $value, $description ) {
-		echo '<tr><th scope="row"><label for="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td><textarea id="' . esc_attr( $key ) . '" rows="8" class="large-text code" name="' . esc_attr( self::field_name( $key ) ) . '">' . esc_textarea( $value ) . '</textarea><p class="description">' . esc_html( $description ) . '</p></td></tr>';
+	private static function row_checkbox( $key, $label, $checked, $description ) {
+		echo '<tr><th scope="row">' . esc_html( $label ) . '</th><td><label><input type="checkbox" name="' . esc_attr( self::field_name( $key ) ) . '" value="1" ' . checked( $checked, true, false ) . ' /> ' . esc_html( $description ) . '</label></td></tr>';
 	}
 
 	private static function row_select( $key, $label, $value, $choices ) {
@@ -228,9 +304,5 @@ class TTFW_Settings {
 			echo '<option value="' . esc_attr( $choice_value ) . '" ' . selected( $value, $choice_value, false ) . '>' . esc_html( $choice_label ) . '</option>';
 		}
 		echo '</select></td></tr>';
-	}
-
-	private static function row_number( $key, $label, $value ) {
-		echo '<tr><th scope="row"><label for="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td><input id="' . esc_attr( $key ) . '" type="number" min="5" max="120" class="small-text" name="' . esc_attr( self::field_name( $key ) ) . '" value="' . esc_attr( (string) $value ) . '" /> ' . esc_html__( 'seconds', 'tornevall-tools-for-wordpress' ) . '</td></tr>';
 	}
 }
