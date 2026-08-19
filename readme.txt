@@ -51,7 +51,11 @@ Dynamic DNS is disabled by default and does not send authenticated requests unti
 
 This plugin integrates with Tornevall Networks Tools at `https://tools.tornevall.net`.
 
-For Guestbook functionality, WordPress may send the configured Guestbook bearer token and Guestbook read/write/moderation data to the Tools Guestbook API. The token is stored server-side and is not sent to public browser JavaScript.
+For Guestbook functionality, WordPress communicates server-to-server with the Tools Guestbook API at:
+
+`https://tools.tornevall.net/api/guestbook`
+
+WordPress may send the configured Guestbook bearer token and Guestbook read/write/moderation data to that service. The token is stored server-side and is not sent to public browser JavaScript.
 
 For Dynamic DNS, WordPress sends the configured Dynamic DNS hostname, bearer token, and `address=auto` to:
 
@@ -73,13 +77,27 @@ https://tools.tornevall.net/docs/en/privacy-policy
 
 = Cloudflare Turnstile =
 
-When public Guestbook signing is enabled, the plugin uses Cloudflare Turnstile. The browser loads the Turnstile challenge and receives the public site key. WordPress sends the returned challenge token and the server-side Turnstile secret to Cloudflare Siteverify for validation before forwarding a Guestbook entry to Tools.
+When public Guestbook signing is enabled, the plugin uses Cloudflare Turnstile. The browser loads the Turnstile widget script from:
+
+`https://challenges.cloudflare.com/turnstile/v0/api.js`
+
+The browser receives the public Turnstile site key and challenge. WordPress then sends the returned challenge token and the server-side Turnstile secret to Cloudflare Siteverify at:
+
+`POST https://challenges.cloudflare.com/turnstile/v0/siteverify`
+
+The Turnstile secret is not exposed to browser JavaScript or markup.
 
 Cloudflare Turnstile documentation:
 https://developers.cloudflare.com/turnstile/
 
-Cloudflare privacy policy:
-https://www.cloudflare.com/privacypolicy/
+Cloudflare Terms of Use:
+https://www.cloudflare.com/policies/terms/
+
+Cloudflare Privacy Policy:
+https://www.cloudflare.com/policies/privacy/
+
+Cloudflare Turnstile Privacy Addendum:
+https://www.cloudflare.com/turnstile-privacy-policy/
 
 == Installation ==
 
