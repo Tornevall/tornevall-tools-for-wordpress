@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Tornevall Tools for WordPress
  * Plugin URI: https://github.com/Tornevall/tornevall-tools-for-wordpress
- * Description: Adds modular Tornevall Networks Tools integrations to WordPress, starting with Dynamic DNS.
+ * Description: Connects WordPress to selected Tornevall Networks Tools services, including Guestbook and Dynamic DNS.
  * Version: 0.2.0
  * Requires at least: 6.5
  * Requires PHP: 7.4
@@ -27,6 +27,7 @@ define( 'TTFW_PATH', plugin_dir_path( __FILE__ ) );
 require_once TTFW_PATH . 'includes/class-ttfw-settings.php';
 require_once TTFW_PATH . 'includes/class-ttfw-api-client.php';
 require_once TTFW_PATH . 'includes/class-ttfw-dynamic-dns-module.php';
+require_once TTFW_PATH . 'includes/class-ttfw-guestbook.php';
 require_once TTFW_PATH . 'includes/class-ttfw-module-registry.php';
 require_once TTFW_PATH . 'includes/class-ttfw-plugin.php';
 

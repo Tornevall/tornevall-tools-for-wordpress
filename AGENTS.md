@@ -4,13 +4,14 @@ This file defines how future agents and developers should continue work on Torne
 
 ## Project goal
 
-Build a modular WordPress-native toolbox around stable Tornevall Networks Tools services.
+Build the WordPress integration layer for stable Tornevall Networks Tools services.
 
-The public plugin must not be defined by one feature category. Individual integrations should be isolated modules that can be enabled only when useful.
+The public plugin must not be defined by one feature category. Individual Tools integrations should stay isolated and should only load the hooks, assets, cron jobs, REST routes, or remote requests they actually need.
 
-Current public module:
+Current public integrations:
 
-1. Dynamic DNS.
+1. Guestbook.
+2. Dynamic DNS.
 
 AI is under separate development and is not part of the current `main` runtime. DNSBL/FraudBL must not be duplicated here because it has its own maintained WordPress plugin.
 
@@ -18,30 +19,31 @@ AI is under separate development and is not part of the current `main` runtime. 
 
 - `tornevall-tools-for-wordpress.php` loads the public plugin runtime.
 - `TTFW_Settings` owns the top-level wp-admin page and sanitized settings.
-- `TTFW_API_Client` makes server-side requests to the fixed Tornevall Networks Tools service origin.
-- `TTFW_Module_Registry` exposes module metadata for the admin overview.
+- `TTFW_API_Client` makes authenticated server-side requests to the fixed Tornevall Networks Tools service origin.
+- `TTFW_Module_Registry` exposes current Tools integrations in the admin overview.
+- `TTFW_Guestbook` provides the public `[tornevall_guestbook]` shortcode.
 - `TTFW_Dynamic_DNS_Module` owns Dynamic DNS updates and WP-Cron scheduling.
 - Credentials stay server-side in WordPress options.
 
 ## Module rules
 
-Each new module should:
+Each new integration should:
 
 - solve one independently useful WordPress problem
-- remain disabled or inactive until the administrator intentionally configures it when remote service use is involved
-- own its own hooks, cron jobs, REST routes, admin actions, and status data
-- avoid loading frontend/editor assets unless the module needs them
-- use the shared Tools API client when talking to `tools.tornevall.net`
+- remain inactive until the administrator configures it or the site author explicitly uses it, depending on the feature
+- own its own hooks, cron jobs, REST routes, admin actions, assets, and status data
+- avoid loading frontend/editor assets unless the integration needs them
+- use the shared Tools API client for authenticated `tools.tornevall.net/api/*` communication where appropriate
 - document the exact external-service data flow in `readme.txt`
 - clean up scheduled events when the plugin is deactivated or uninstalled
 
-Do not add a module merely because a Tools feature exists. The WordPress integration must have a clear use case.
+Do not add an integration merely because a Tools feature exists. The WordPress use case must be clear.
 
 ## Scope boundaries
 
 ### AI
 
-AI work currently lives outside the public main release line. When it returns, it should return as an optional module and be reviewed against the WordPress version current at that time.
+AI work currently lives outside the public main release line. When it returns, it should return as an optional module and be reviewed against the WordPress editor and AI APIs current at that time.
 
 ### DNSBL/FraudBL
 
@@ -51,9 +53,13 @@ Do not implement DNSBL/FraudBL protection in this repository. It belongs in:
 https://github.com/Tornevall/tornevall-wp-dnsbl
 ```
 
-### External executable code
+### External service code
 
-Do not load executable JavaScript, CSS, PHP, plugin updates, or add-ons from Tornevall Networks Tools. WordPress.org permits documented SaaS/API communication but does not permit using an external service as a remote code delivery mechanism.
+Do not use Tornevall Networks Tools as a generic remote code-delivery or plugin-update mechanism.
+
+A service-owned frontend client may only be loaded remotely when it is an integral part of the documented service itself, is loaded only when that service is explicitly used, and remains compatible with the current WordPress.org Plugin Directory guidelines. The guestbook embed is currently treated as serviceware: its script is loaded only on pages where `[tornevall_guestbook]` is rendered.
+
+If WordPress.org review requires a locally packaged guestbook client instead, replace the remote embed with an API-backed local renderer before release rather than working around the review requirement.
 
 ## Required documentation practice
 
@@ -81,7 +87,7 @@ Follow WordPress plugin practices:
 - Use `WP_Error` for recoverable failures.
 - Keep credentials server-side.
 - Keep code compatible with the declared PHP version.
-- Do not add arbitrary remote endpoint settings when a module only needs the official Tools service origin.
+- Do not add arbitrary authenticated API origins when a module only needs the official Tools service origin.
 
 ## Security and privacy requirements
 
@@ -92,6 +98,31 @@ Follow WordPress plugin practices:
 - Store only the minimum status information needed for diagnostics.
 - Do not make external service calls merely because the plugin was activated.
 - Every remote data flow must be documented in `readme.txt` before public release.
+- Public integrations must not receive unrelated private credentials.
+
+## Guestbook contract
+
+Default service-owned embed endpoint:
+
+```text
+https://tools.tornevall.net/guestbook/embed.js
+```
+
+The `[tornevall_guestbook]` shortcode supports:
+
+- `theme`: `tools`, `miazma`, or `terminal`
+- `limit`: 1-50
+
+The shortcode must:
+
+- create a unique target element for each shortcode instance
+- pass only public presentation parameters to the Tools guestbook service
+- enqueue the guestbook service only when the shortcode is rendered
+- keep the endpoint HTTPS-only
+- fall back to the production endpoint if a developer filter returns an invalid URL
+- never expose Tools API tokens, AI/provider tokens, or private guestbook fields
+
+The `ttfw_guestbook_embed_url` filter may be used for HTTPS staging/testing endpoints. It must not become a vehicle for browser-side secrets.
 
 ## Dynamic DNS contract
 
@@ -134,9 +165,10 @@ Before submission or release:
 2. Smoke-test against the latest stable WordPress release.
 3. Run the official Plugin Check checks.
 4. Validate `readme.txt` with the official readme validator.
-5. Confirm all external service disclosures are current.
-6. Confirm the final plugin name/slug before review begins.
-7. Keep the WordPress.org SVN release synchronized with the released plugin version.
+5. Confirm all external-service disclosures are current.
+6. Specifically review the guestbook service integration against current Plugin Directory guideline 8.
+7. Confirm the final plugin name/slug before review begins.
+8. Keep the WordPress.org SVN release synchronized with the released plugin version.
 
 Do not add a custom self-updater for the WordPress.org build.
 
@@ -157,9 +189,15 @@ phpcs --standard=WordPress .
 ## Manual test checklist
 
 - Activate the plugin without fatal errors.
-- Confirm no remote request is made while Dynamic DNS is disabled.
+- Confirm activation alone makes no remote request.
 - Open `Tornevall Tools` as an administrator.
-- Confirm users without `manage_options` cannot access settings or manual update actions.
+- Confirm users without `manage_options` cannot access settings or manual Dynamic DNS actions.
+- Add `[tornevall_guestbook]` to a public page and confirm the widget loads.
+- Test guestbook themes `tools`, `miazma`, and `terminal`.
+- Test a guestbook `limit` below 1 and above 50 and confirm it is clamped.
+- Confirm invalid guestbook themes fall back to `tools`.
+- Confirm no private token or guestbook e-mail address appears in the page source or guestbook request.
+- Confirm no Dynamic DNS request is made while Dynamic DNS is disabled.
 - Save a Dynamic DNS hostname and token.
 - Save again with the token field blank and confirm the stored token is preserved.
 - Enable Dynamic DNS and confirm one WP-Cron event is scheduled.
@@ -175,7 +213,7 @@ Every pull request should include:
 
 - a linked issue/ticket
 - summary of behavior changes
-- security/privacy notes for settings, remote requests, uploads, REST, or cron work
+- security/privacy notes for settings, remote requests, public embeds, uploads, REST, or cron work
 - manual test notes
 - changelog update
 - documentation update when behavior changes
@@ -185,7 +223,8 @@ Every pull request should include:
 - Do not turn the public plugin back into an AI-only product.
 - Do not duplicate the standalone DNSBL/FraudBL plugin.
 - Do not expose service credentials to JavaScript.
-- Do not allow arbitrary remote API origins without a documented requirement and security review.
+- Do not forward arbitrary shortcode values or non-HTTPS guestbook embed URLs.
+- Do not allow arbitrary authenticated API origins without a documented requirement and security review.
 - Do not add unauthenticated state-changing endpoints.
 - Do not silently swallow remote service errors.
 - Do not hardcode user-specific secrets.

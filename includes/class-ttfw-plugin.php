@@ -20,6 +20,7 @@ class TTFW_Plugin {
 	 */
 	public static function init() {
 		TTFW_Settings::init();
+		TTFW_Guestbook::init();
 		TTFW_Dynamic_DNS_Module::init();
 
 		add_action( 'plugins_loaded', array( __CLASS__, 'load_textdomain' ) );

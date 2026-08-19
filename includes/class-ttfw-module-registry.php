@@ -22,6 +22,12 @@ class TTFW_Module_Registry {
 		$options = TTFW_Settings::get_options();
 
 		return array(
+			'guestbook' => array(
+				'name'        => __( 'Guestbook', 'tornevall-tools-for-wordpress' ),
+				'description' => __( 'Embed the public Tornevall Networks Tools guestbook in posts and pages with a shortcode.', 'tornevall-tools-for-wordpress' ),
+				'enabled'     => true,
+				'status'      => __( 'Available', 'tornevall-tools-for-wordpress' ),
+			),
 			'dynamic-dns' => array(
 				'name'        => __( 'Dynamic DNS', 'tornevall-tools-for-wordpress' ),
 				'description' => __( 'Keep a Tornevall Networks Dynamic DNS hostname updated from this WordPress server.', 'tornevall-tools-for-wordpress' ),

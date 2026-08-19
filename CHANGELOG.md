@@ -6,34 +6,45 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Added
 
-- Added a top-level `Tornevall Tools` wp-admin page.
-- Added a small module registry for independently enabled Tools features.
+- Added a top-level `Tornevall Tools` wp-admin page and module overview.
 - Added a shared server-side API client restricted to documented `https://tools.tornevall.net/api/*` requests.
-- Added the first Dynamic DNS module.
-- Added manual Dynamic DNS updates with `manage_options` and nonce protection.
-- Added scheduled Dynamic DNS updates through WordPress WP-Cron.
-- Added configurable hourly, twice-daily, and daily update intervals.
-- Added server-side Dynamic DNS token storage with blank-field preservation.
-- Added last-run Dynamic DNS status in wp-admin.
-- Added explicit external-service documentation for Tornevall Networks Tools.
+- Added the Dynamic DNS integration with manual updates, WP-Cron scheduling, server-side token storage, and last-run status.
+- Kept the public `[tornevall_guestbook]` Tools guestbook integration introduced on `main` in 0.1.1.
+- Added Guestbook to the Tools module overview alongside Dynamic DNS.
+- Added explicit external-service documentation for both current Tools integrations.
 
 ### Changed
 
 - Established Tornevall Tools for WordPress as the WordPress integration/client for selected Tornevall Networks Tools services.
 - Reworked README and WordPress.org readme wording around actual Tools service integrations rather than a single feature category.
-- Dynamic DNS is presented as the first complete Tools module and the initial independently useful release feature.
+- Guestbook and Dynamic DNS are now presented together as the first public Tools feature set.
 
 ### Removed
 
-- Removed the AI service, AI REST controller, editor sidebar/block JavaScript, and AI editor CSS from the `main` release line.
+- Removed the AI service, AI REST controller, editor sidebar/block JavaScript, and AI editor CSS from the public release line.
 - DNSBL/FraudBL remains outside this plugin because it has its own maintained WordPress plugin.
 
 ### Security and privacy
 
 - Dynamic DNS is disabled by default and does not make remote requests until explicitly enabled and configured.
 - Dynamic DNS credentials remain server-side.
-- Remote API requests are restricted to the fixed Tornevall Networks Tools service origin.
-- Manual update actions require administrator capability and a WordPress nonce.
+- Authenticated API requests are restricted to the fixed Tornevall Networks Tools service origin.
+- Manual Dynamic DNS updates require administrator capability and a WordPress nonce.
+- The guestbook integration is public and token-free, accepts only allow-listed presentation parameters, and requires an HTTPS service endpoint.
+
+## [0.1.1] - 2026-08-19
+
+### Added
+
+- Public `[tornevall_guestbook]` shortcode for embedding the Tools guestbook.
+- Guestbook theme selection through `theme="tools"`, `theme="miazma"`, or `theme="terminal"`.
+- Guestbook entry limit through the `limit` shortcode attribute.
+- `ttfw_guestbook_embed_url` developer filter for HTTPS staging/testing endpoints.
+
+### Security
+
+- The guestbook integration exposes no provider or API tokens.
+- The embed endpoint is restricted to HTTPS and falls back to the production Tools URL when an invalid override is supplied.
 
 ## [0.1.0] - 2026-06-18
 
@@ -47,4 +58,4 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ## Development note
 
-The AI editor work continues separately in PR #3 and is not part of the current public `main` release line. It can be reintroduced later as an optional module after production hardening and current WordPress integration work are complete.
+The AI editor work continues separately in PR #3 and is not part of the current public release line. It can return later as an optional Tools integration after production hardening and current WordPress integration work are complete.
