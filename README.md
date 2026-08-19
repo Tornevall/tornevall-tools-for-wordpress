@@ -7,54 +7,29 @@ The AI implementation supports two providers:
 1. Tornevall Networks Tools AI through `https://tools.tornevall.net/api/ai/internal/respond`.
 2. Direct OpenAI access through the OpenAI Responses API.
 
-The plugin is intentionally WordPress-native. API tokens are configured in wp-admin and used only from PHP. The block editor calls a local WordPress REST endpoint, and that endpoint forwards sanitized requests to the selected provider.
+The plugin is intentionally WordPress-native. API tokens are configured in wp-admin and used only from PHP. Browser-side features call local WordPress endpoints, and WordPress performs authenticated remote requests server-side.
 
 ## Current status
 
-Version `0.1.1` adds the first public Tools integration outside the editor: an embeddable Tools guestbook shortcode.
+Version `0.1.2` turns the guestbook integration into an owner-scoped central guestbook client while keeping Tools as the authoritative database.
 
 Implemented now:
 
-- wp-admin settings page under `Settings -> Tornevall Tools AI`.
-- Configurable default provider.
-- Configurable default persona.
-- Configurable OpenAI API token and model.
-- Configurable Tornevall Tools AI bearer token, endpoint, client slug, and optional model override.
-- Block editor sidebar named `Tornevall AI`.
-- Block inserter block named `Tornevall AI Assistant` in the `Text` category.
-- Server-side REST endpoint at `/wp-json/ttfw/v1/ai/respond`.
-- Insert and replace controls for generated content.
-- Public `[tornevall_guestbook]` shortcode backed by the Tools guestbook JavaScript embed.
-- Guestbook themes: `tools`, `miazma`, and `terminal`.
-- Tokens are not localized to JavaScript.
-- Settings sanitization and output escaping.
-- REST permission callback based on `edit_posts`.
+- wp-admin settings page under `Settings -> Tornevall Tools AI`
+- configurable OpenAI and Tools AI providers
+- block editor sidebar and assistant block
+- server-side AI REST endpoint at `/wp-json/ttfw/v1/ai/respond`
+- public `[tornevall_guestbook]` shortcode with `tools`, `miazma`, and `terminal` themes
+- dedicated guestbook API URL/token stored server-side
+- owner-scoped public guestbook reading through local WordPress REST
+- public WordPress guestbook signing through `/wp-json/ttfw/v1/guestbook/entries`
+- per-site Cloudflare Turnstile protection for public signing
+- WordPress admin guestbook under `Tools -> Tools Guestbook`, limited to the configured token's own entries
+- recommended add-ons panel for Tornevall Networks DNSBL Implementation
+- optional DNSBL visitor-IP blocking, checking and explicit administrator abuse reporting
+- tokens and Turnstile secrets are never localized to public JavaScript
 
-Not implemented yet:
-
-- Streaming responses.
-- Per-user token storage.
-- Full conversation history.
-- Image generation.
-- Provider model discovery.
-- Automated test suite.
-- Native Gutenberg guestbook block. The shortcode is the first integration and test surface.
-
-## Requirements
-
-- WordPress 6.5 or newer.
-- PHP 7.4 or newer.
-- A user with `manage_options` to configure the AI connectors.
-- Editor users need `edit_posts` to use the AI REST endpoint.
-- For OpenAI direct mode: an OpenAI API key and model name.
-- For Tornevall Tools AI mode: a Tools bearer token with the correct AI scope for the configured endpoint.
-- For the guestbook shortcode: public HTTPS access to `tools.tornevall.net`.
-
-## Guestbook embed
-
-The plugin can embed the public Tools guestbook in any post, page, or widget area that processes WordPress shortcodes.
-
-Basic usage:
+## Guestbook
 
 ```text
 [tornevall_guestbook]
@@ -66,36 +41,73 @@ Choose a theme and number of entries:
 [tornevall_guestbook theme="miazma" limit="10"]
 ```
 
-Available themes:
+`limit` is clamped to 1-50 entries. The public list renders in Shadow DOM.
 
-- `tools` - modern default styling.
-- `miazma` - modernized black and blue Miazmabook styling.
-- `terminal` - compact dark monospace styling.
+The shortcode no longer loads the global Tools feed for WordPress tenants. The browser calls the local WordPress REST endpoint, WordPress authenticates to Tools from PHP, and Tools returns only visible entries whose `source_api_key_id` matches the configured API key.
 
-`limit` is clamped to 1-50 entries.
+A different guestbook token therefore cannot enumerate or mutate this token's entries. Use a separate Tools guestbook token when separate sites should have separate guestbooks.
 
-The shortcode creates a unique target element and enqueues the Tools JavaScript entry at:
+### Public signing
+
+The flow is:
 
 ```text
-https://tools.tornevall.net/guestbook/embed.js
+Visitor browser -> WordPress REST -> Turnstile Siteverify -> Tools guestbook API -> central guestbook database
 ```
 
-The remote widget renders inside Shadow DOM, so the active WordPress theme should not alter the guestbook presentation. The embed contains public guestbook data only. E-mail addresses and AI/provider tokens are never included.
+The browser never receives the Tools guestbook token or Turnstile secret.
 
-For staging or local integration testing, developers can override the embed URL without adding an admin-facing setting:
+Public signing requires a configured guestbook token plus a Cloudflare Turnstile site key and secret for the WordPress hostname. WordPress validates the Turnstile response server-side, checks the returned hostname and requires action `guestbook`, then forwards sanitized form fields, the original visitor IP and site identity to Tools.
 
-```php
-add_filter(
-    'ttfw_guestbook_embed_url',
-    static function () {
-        return 'https://staging.example.test/guestbook/embed.js';
-    }
-);
+If Turnstile is missing, the existing guestbook remains readable but signing is disabled.
+
+### Guestbook token and Turnstile
+
+Open:
+
+```text
+/wp-admin/tools.php?page=tornevall-tools-guestbook
 ```
 
-Only valid HTTPS URLs are accepted. Invalid overrides fall back to the production Tools endpoint.
+Configure:
 
-## Provider behavior
+- HTTPS Tools guestbook API endpoint
+- Tools API key with `guestbook.write` and `guestbook.moderate`
+- Cloudflare Turnstile site key for this WordPress hostname
+- Cloudflare Turnstile secret key
+
+Secret fields render blank and preserve existing stored values when saved blank.
+
+### WordPress guestbook admin
+
+`Tools -> Tools Guestbook` loads only entries owned by the configured token.
+
+The page supports:
+
+- search
+- visible/hidden filtering
+- DNSBL status filtering when the addon exists
+- private e-mail and source-IP review for the token's entries
+- hide/restore actions through `guestbook.moderate`
+- optional DNSBL IP checks
+- explicit DNSBL abuse reporting when the DNSBL addon is active and its own token has add permission
+
+## Recommended DNSBL addon
+
+The guestbook does **not** require the DNSBL plugin.
+
+When the DNSBL plugin is absent:
+
+- the token-owned guestbook still renders
+- visitors can still sign when Turnstile is configured
+- owner-scoped moderation still works
+- no DNSBL check/report controls exist in Tools for WordPress
+
+When DNSBL is active, Tools for WordPress uses the generic plugin-to-plugin bridge exposed by Tornevall Networks DNSBL Implementation rather than reaching into plugin internals.
+
+Blacklist publication is never automatic. `Report abuse` requires a WordPress administrator and a DNSBL token with add permission. The consumer sends safe source type/name/note metadata so Tools can publish useful DNS TXT audit context. Visitor name, e-mail and message contents must not be placed in public TXT data.
+
+## AI provider behavior
 
 ### Tornevall Tools AI
 
@@ -105,139 +117,76 @@ Default endpoint:
 https://tools.tornevall.net/api/ai/internal/respond
 ```
 
-The plugin sends the Tools-specific request shape:
-
-```json
-{
-  "client_slug": "tornevall_tools_wordpress",
-  "context": "Selected block context and optional persona",
-  "user_prompt": "Editor instruction",
-  "client_name": "Tornevall Tools for WordPress",
-  "client_version": "0.1.1",
-  "client_platform": "wordpress"
-}
-```
-
-The `client_slug` should be stable. Tools can use it for server-side defaults, audit trails, and usage statistics. This endpoint is not treated as a generic OpenAI-compatible endpoint because it expects Tools-specific fields.
+The plugin sends the Tools-specific request contract from PHP. The `client_slug` should stay stable so Tools can apply server-side defaults, auditing and usage statistics.
 
 ### OpenAI direct
 
-The OpenAI connector calls:
+The OpenAI connector calls the OpenAI Responses API from PHP with the configured model, developer persona and user/editor context.
 
-```text
-https://api.openai.com/v1/responses
-```
+## Requirements
 
-The plugin sends a Responses API request with `model`, `input[]`, a `developer` message containing the configured persona, and a `user` message containing selected block context plus the editor prompt.
-
-The default model is currently `gpt-4o-mini`, but this must be reviewed before release and can be changed in wp-admin.
-
-## Editor UI
-
-The plugin exposes two editor entry points:
-
-1. `Tornevall AI` sidebar in the editor plugin sidebar area.
-2. `Tornevall AI Assistant` block in the block inserter `Text` category.
-
-The sidebar is the primary workflow. It reads the currently selected block or blocks as context, sends that context to the WordPress REST endpoint, and can insert the result after the selection or replace the selection.
-
-The block exists so the assistant can also be discovered where writing-related blocks are normally found. It can store generated HTML into the block content.
-
-## Settings
-
-The settings page is located at:
-
-```text
-/wp-admin/options-general.php?page=tornevall-tools-ai
-```
-
-Available settings:
-
-| Setting | Purpose |
-| --- | --- |
-| Default provider | `tools` or `openai`. |
-| Default persona | Server-side default instruction used for both providers. |
-| OpenAI API token | Direct OpenAI API key. Blank field preserves existing value. |
-| OpenAI model | Model name for direct OpenAI requests. |
-| Tools AI token | Bearer token for Tools AI. Blank field preserves existing value. |
-| Tools AI endpoint | Tools endpoint URL. HTTPS only. |
-| Tools client slug | Stable client identifier sent to Tools. |
-| Tools model override | Optional model override. Blank uses Tools-side defaults. |
-| Response language | `auto`, `sv`, `en`, `da`, `no`, `de`, `fr`, or `es`. |
-| HTTP timeout | 5-120 seconds. |
+- WordPress 6.5 or newer
+- PHP 7.4 or newer
+- `manage_options` for plugin and guestbook administration
+- `edit_posts` for the AI editor endpoint
+- a suitable provider key for AI features
+- a Tools API key with guestbook scopes for WordPress guestbook reading/signing/moderation
+- Cloudflare Turnstile keys for public guestbook signing
+- Tornevall Networks DNSBL Implementation only when optional DNSBL protection/reporting is wanted
 
 ## Security notes
 
-- Tokens are stored in the WordPress options table.
-- Tokens are never passed to JavaScript.
-- Token input fields are blank on render. A blank submitted token preserves the stored token.
-- The block editor calls only the local WordPress REST endpoint.
-- The REST endpoint requires an authenticated user with `edit_posts`.
-- Settings require `manage_options`.
-- Admin output is escaped.
-- Settings and REST input are sanitized before use.
-- Remote requests use WordPress HTTP APIs.
-- The guestbook embed is public and token-free.
-- The guestbook embed URL must use HTTPS.
+- AI, guestbook and DNSBL tokens stay server-side
+- Turnstile secret stays server-side; only the public site key is rendered
+- public guestbook JavaScript talks only to local WordPress REST
+- Tools owner-scopes public reads and remote moderation to the exact configured API key
+- e-mail addresses and visitor IPs are not part of public guestbook payloads
+- WordPress validates Turnstile hostname and action before forwarding a post
+- guestbook moderation requires `manage_options` plus remote `guestbook.moderate`
+- DNSBL controls do not exist without the optional addon
+- DNSBL report controls additionally require the add permission reported by that addon's token
+- DNSBL publication is always an explicit administrator action
+- remote requests use WordPress HTTP APIs
 
 ## Development structure
 
 ```text
-tornevall-tools-for-wordpress.php  Main plugin bootstrap
-includes/class-ttfw-plugin.php      Hooks and editor asset loading
-includes/class-ttfw-settings.php    Settings API and sanitization
-includes/class-ttfw-rest-controller.php REST endpoint
-includes/class-ttfw-ai-service.php  Provider adapters
-includes/class-ttfw-guestbook.php   Public Tools guestbook shortcode integration
-assets/editor.js                    Block editor UI, no build step yet
-assets/editor.css                   Editor styles
-readme.txt                          WordPress.org-style plugin readme
-README.md                           Project and developer documentation
-CHANGELOG.md                        Release history, always update
-AGENTS.md                           Development rules for future agents
-uninstall.php                       Option cleanup on uninstall
+tornevall-tools-for-wordpress.php       Main plugin bootstrap
+includes/class-ttfw-plugin.php          Hooks and asset loading
+includes/class-ttfw-settings.php        AI settings and sanitization
+includes/class-ttfw-rest-controller.php AI REST endpoint
+includes/class-ttfw-ai-service.php      AI provider adapters
+includes/class-ttfw-guestbook.php       Guestbook shortcode and public form
+includes/class-ttfw-guestbook-api.php   Server-side Tools guestbook API client
+includes/class-ttfw-guestbook-settings.php Guestbook and Turnstile credentials
+includes/class-ttfw-guestbook-rest.php  Owner-scoped read/sign WordPress proxy
+includes/class-ttfw-guestbook-admin.php Owner-scoped moderation and addon UI
+assets/guestbook.js                     Owner-scoped public list/sign client
+assets/editor.js                        Block editor UI, no build step
+assets/editor.css                       Editor styles
+readme.txt                              WordPress.org-style plugin readme
+README.md                               Project and developer documentation
+CHANGELOG.md                            Release history, always update
+AGENTS.md                               Development rules for future agents
 ```
 
-## Local installation
+## Manual testing
 
-1. Copy the plugin directory to `wp-content/plugins/tornevall-tools-for-wordpress`.
-2. Activate `Tornevall Tools for WordPress` in wp-admin.
-3. Open `Settings -> Tornevall Tools AI` to configure AI providers when needed.
-4. Open the block editor and use `Tornevall AI` from the editor sidebar or insert the `Tornevall AI Assistant` block.
-5. To test the Tools guestbook, add `[tornevall_guestbook theme="miazma" limit="10"]` to a page and view the page on the frontend.
+Before merging a guestbook change:
 
-## Testing checklist
-
-Before merging a change:
-
-- Activate the plugin without PHP fatal errors.
-- Save settings with empty token fields and confirm existing token values are preserved.
-- Save settings with invalid Tools URL and confirm fallback to the default URL.
-- Open the block editor with no JavaScript console errors.
-- Generate through Tools AI using a valid token.
-- Generate through OpenAI direct using a valid token.
-- Confirm generated text can be inserted after selected blocks.
-- Confirm generated text can replace selected blocks.
-- Confirm users without `edit_posts` cannot call the REST endpoint.
-- Confirm settings are available only to `manage_options` users.
-- Add `[tornevall_guestbook]` to a public page and confirm the widget renders.
-- Test `tools`, `miazma`, and `terminal` themes.
-- Confirm an invalid shortcode theme falls back to `tools`.
-- Confirm `limit` stays within 1-50.
-- Confirm no provider token appears in the guestbook page source or network request.
-- Run PHP lint for all PHP files.
-- Run WordPress Coding Standards when available.
-
-## Suggested next development steps
-
-1. Add automated PHPUnit tests for settings sanitization and REST permission handling.
-2. Add JavaScript unit or E2E tests for the editor flows.
-3. Add provider health checks from wp-admin.
-4. Add model discovery where the provider supports it.
-5. Add support for per-role or per-user provider restrictions.
-6. Add opt-in request logging without storing secrets or full private post content.
-7. Add streaming once the provider and editor UX are ready.
-8. Promote the guestbook shortcode into a native Gutenberg block if the embed contract proves stable.
+1. Activate the plugin without PHP fatal errors.
+2. Open `Tools -> Tools Guestbook` with no token and confirm the configuration state is safe.
+3. Configure a guestbook token and site-local Turnstile keys.
+4. Add `[tornevall_guestbook theme="miazma" limit="10"]` to a public page.
+5. Confirm the public list contains only entries created through this token.
+6. Submit a public entry and confirm the browser sends no Tools token or Turnstile secret.
+7. Confirm the new entry appears after successful Turnstile verification.
+8. Confirm another guestbook token's entries are neither listed nor mutable.
+9. Hide and restore an owned entry from WordPress admin.
+10. Test with the DNSBL addon absent; no DNSBL controls should exist.
+11. Activate the DNSBL addon and verify capability-aware check/report controls.
+12. Confirm `Report abuse` appears only when the DNSBL token can add records.
+13. Run PHP lint across all PHP files and WordPress Coding Standards when installed.
 
 ## License
 
