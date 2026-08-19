@@ -1,6 +1,6 @@
 <?php
 /**
- * Public Tools guestbook embed integration.
+ * Public Tools guestbook integration.
  *
  * @package TornevallToolsForWordPress
  */
@@ -9,11 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/**
- * Registers and renders the public Tools guestbook shortcode.
- */
 class TTFW_Guestbook {
-	const DEFAULT_EMBED_URL = 'https://tools.tornevall.net/guestbook/embed.js';
 	const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
 	/** @var int */
@@ -46,56 +42,47 @@ class TTFW_Guestbook {
 		}
 
 		$limit = max( 1, min( 50, absint( $atts['limit'] ) ) );
-
 		self::$instance++;
-		$target_id  = sprintf( 'ttfw-guestbook-%d-%d', self::$instance, wp_rand( 1000, 999999 ) );
-		$form_id    = $target_id . '-form';
-		$script_url = add_query_arg(
-			array(
-				'theme'  => $theme,
-				'limit'  => $limit,
-				'target' => $target_id,
-			),
-			self::get_embed_url()
-		);
 
-		wp_enqueue_script(
-			'ttfw-guestbook-embed-' . self::$instance,
-			$script_url,
-			array(),
-			null,
-			true
-		);
-
+		$target_id = sprintf( 'ttfw-guestbook-%d-%d', self::$instance, wp_rand( 1000, 999999 ) );
+		$form_id   = $target_id . '-form';
+		$endpoint  = rest_url( 'ttfw/v1/guestbook/entries' );
 		$api_configured = TTFW_Guestbook_API::configured();
 		$turnstile_configured = TTFW_Guestbook_Settings::turnstile_configured();
 
-		if ( $api_configured && $turnstile_configured ) {
+		if ( $api_configured ) {
+			$dependencies = array();
+			if ( $turnstile_configured ) {
+				wp_enqueue_script(
+					'cloudflare-turnstile',
+					self::TURNSTILE_SCRIPT_URL,
+					array(),
+					null,
+					true
+				);
+				$dependencies[] = 'cloudflare-turnstile';
+			}
+
 			wp_enqueue_script(
-				'cloudflare-turnstile',
-				self::TURNSTILE_SCRIPT_URL,
-				array(),
-				null,
-				true
-			);
-			wp_enqueue_script(
-				'ttfw-guestbook-form',
+				'ttfw-guestbook',
 				TTFW_URL . 'assets/guestbook.js',
-				array( 'cloudflare-turnstile' ),
+				$dependencies,
 				TTFW_VERSION,
 				true
 			);
 		}
 
-		$html = sprintf(
-			'<div id="%1$s" class="ttfw-guestbook-embed" data-theme="%2$s"></div>',
-			esc_attr( $target_id ),
-			esc_attr( $theme )
-		);
-
 		if ( ! $api_configured ) {
-			return $html;
+			return '<p class="ttfw-guestbook-not-configured">' . esc_html__( 'This guestbook has not been connected to Tools yet.', 'tornevall-tools-for-wordpress' ) . '</p>';
 		}
+
+		$html = sprintf(
+			'<div id="%1$s" class="ttfw-guestbook-embed" data-ttfw-guestbook-list data-endpoint="%2$s" data-theme="%3$s" data-limit="%4$d"></div>',
+			esc_attr( $target_id ),
+			esc_url( $endpoint ),
+			esc_attr( $theme ),
+			$limit
+		);
 
 		if ( ! $turnstile_configured ) {
 			$html .= '<p class="ttfw-guestbook-signing-disabled">' . esc_html__( 'Guestbook reading is available, but signing is disabled until Cloudflare Turnstile is configured for this WordPress site.', 'tornevall-tools-for-wordpress' ) . '</p>';
@@ -103,9 +90,10 @@ class TTFW_Guestbook {
 		}
 
 		$html .= sprintf(
-			'<form id="%1$s" class="ttfw-guestbook-form" data-ttfw-guestbook-form data-endpoint="%2$s">',
+			'<form id="%1$s" class="ttfw-guestbook-form" data-ttfw-guestbook-form data-endpoint="%2$s" data-list-target="%3$s">',
 			esc_attr( $form_id ),
-			esc_url( rest_url( 'ttfw/v1/guestbook/entries' ) )
+			esc_url( $endpoint ),
+			esc_attr( $target_id )
 		);
 		$html .= '<h3>' . esc_html__( 'Sign the guestbook', 'tornevall-tools-for-wordpress' ) . '</h3>';
 		$html .= '<p><label>' . esc_html__( 'Name', 'tornevall-tools-for-wordpress' ) . '<br><input type="text" name="name" required maxlength="191" autocomplete="name"></label></p>';
@@ -120,19 +108,5 @@ class TTFW_Guestbook {
 		$html .= '</form>';
 
 		return $html;
-	}
-
-	/**
-	 * @return string
-	 */
-	private static function get_embed_url() {
-		$url = apply_filters( 'ttfw_guestbook_embed_url', self::DEFAULT_EMBED_URL );
-		$url = is_string( $url ) ? esc_url_raw( $url ) : '';
-
-		if ( ! wp_http_validate_url( $url ) || 'https' !== wp_parse_url( $url, PHP_URL_SCHEME ) ) {
-			return self::DEFAULT_EMBED_URL;
-		}
-
-		return $url;
 	}
 }
