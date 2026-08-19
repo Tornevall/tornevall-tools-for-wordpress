@@ -10,11 +10,17 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 - Added one-click block actions for rephrase, simplify, summarize, expand, shorten, clarify, tone changes, and Swedish or English translation.
 - Added an `Ask AI Assistant` modal for custom per-block rewrite instructions.
 - Added shared editor AI request helper so the sidebar, assistant block, and inline toolbar use the same server-side endpoint.
+- Added GitHub Actions syntax checks for supported PHP versions and the editor JavaScript bundle.
 
 ### Changed
 
 - Bumped plugin version to `0.3.0`.
 - Added the WordPress `wp-hooks` editor script dependency so the plugin can extend `editor.BlockEdit` safely.
+
+### Security
+
+- Direct OpenAI Responses API calls explicitly disable response storage with `store: false`.
+- DOCX extraction limits individual uncompressed XML entries to reduce decompression and memory-exhaustion risk.
 
 ## [0.2.0] - 2026-06-18
 
