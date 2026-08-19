@@ -19,8 +19,9 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Changed
 
-- Refocused the public plugin from an AI-first editor integration to the general Tornevall Tools for WordPress product.
-- Updated plugin metadata, README, and WordPress.org readme wording to describe a modular Tools plugin.
+- Established Tornevall Tools for WordPress as the WordPress integration/client for selected Tornevall Networks Tools services.
+- Reworked README and WordPress.org readme wording around actual Tools service integrations rather than a single feature category.
+- Dynamic DNS is presented as the first complete Tools module and the initial independently useful release feature.
 
 ### Removed
 
