@@ -33,6 +33,18 @@ class TTFW_Guestbook_API {
 	}
 
 	/**
+	 * @param array<string,mixed> $query Public listing query.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	public function owned_entries( $query = array() ) {
+		$path = '/owned/entries';
+		if ( ! empty( $query ) ) {
+			$path = add_query_arg( $query, $path );
+		}
+		return $this->request( 'GET', $path );
+	}
+
+	/**
 	 * @param array<string,mixed> $payload Guestbook form data.
 	 * @return array<string,mixed>|WP_Error
 	 */
