@@ -1,6 +1,6 @@
 <?php
 /**
- * Public WordPress REST proxy for guestbook submissions.
+ * Public WordPress REST proxy for owner-scoped guestbook reads and submissions.
  *
  * @package TornevallToolsForWordPress
  */
@@ -21,11 +21,50 @@ class TTFW_Guestbook_REST {
 			self::REST_NAMESPACE,
 			'/guestbook/entries',
 			array(
-				'methods'             => WP_REST_Server::CREATABLE,
-				'callback'            => array( __CLASS__, 'store' ),
-				'permission_callback' => '__return_true',
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'index' ),
+					'permission_callback' => '__return_true',
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( __CLASS__, 'store' ),
+					'permission_callback' => '__return_true',
+				),
 			)
 		);
+	}
+
+	/**
+	 * Public read proxy. The browser never receives the Tools token; WordPress
+	 * authenticates server-side and Tools returns only this token's visible rows.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function index( WP_REST_Request $request ) {
+		if ( ! TTFW_Guestbook_API::configured() ) {
+			return new WP_Error(
+				'ttfw_guestbook_not_configured',
+				__( 'Guestbook is not configured on this site.', 'tornevall-tools-for-wordpress' ),
+				array( 'status' => 503 )
+			);
+		}
+
+		$limit = max( 1, min( 50, absint( $request->get_param( 'limit' ) ?: 10 ) ) );
+		$page  = max( 1, absint( $request->get_param( 'page' ) ?: 1 ) );
+		$result = ( new TTFW_Guestbook_API() )->owned_entries(
+			array(
+				'limit' => $limit,
+				'page'  => $page,
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( $result );
 	}
 
 	/**
