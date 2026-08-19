@@ -46,17 +46,19 @@ class TTFW_Guestbook_Admin {
 
 		$options      = TTFW_Guestbook_Settings::get_options();
 		$has_token    = '' !== trim( (string) $options['token'] );
+		$has_turnstile_secret = '' !== trim( (string) $options['turnstile_secret_key'] );
 		$dnsbl        = self::dnsbl_status();
 		$query        = self::admin_query();
 		$remote       = TTFW_Guestbook_API::configured() ? ( new TTFW_Guestbook_API() )->admin_entries( $query ) : null;
 		$entries      = is_array( $remote ) && isset( $remote['entries'] ) && is_array( $remote['entries'] ) ? $remote['entries'] : array();
 		$pagination   = is_array( $remote ) && isset( $remote['pagination'] ) && is_array( $remote['pagination'] ) ? $remote['pagination'] : array();
+		$site_host    = (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST );
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Tools Guestbook', 'tornevall-tools-for-wordpress' ) . '</h1>';
 		self::render_notice();
 
-		echo '<h2>' . esc_html__( 'Connection', 'tornevall-tools-for-wordpress' ) . '</h2>';
-		echo '<p>' . esc_html__( 'The guestbook database stays in Tools. WordPress stores only the server-side token used to submit and moderate entries.', 'tornevall-tools-for-wordpress' ) . '</p>';
+		echo '<h2>' . esc_html__( 'Connection and public signing', 'tornevall-tools-for-wordpress' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Tools stores the guestbook centrally. This WordPress installation can only moderate entries owned by its configured guestbook token. Tokens and Turnstile secrets stay server-side.', 'tornevall-tools-for-wordpress' ) . '</p>';
 		echo '<form action="options.php" method="post">';
 		settings_fields( TTFW_Guestbook_Settings::SETTINGS_GROUP );
 		echo '<table class="form-table" role="presentation"><tbody>';
@@ -65,14 +67,20 @@ class TTFW_Guestbook_Admin {
 		echo '<p class="description">' . esc_html__( 'HTTPS endpoint only.', 'tornevall-tools-for-wordpress' ) . '</p></td></tr>';
 		echo '<tr><th scope="row"><label for="ttfw-guestbook-token">' . esc_html__( 'Guestbook token', 'tornevall-tools-for-wordpress' ) . '</label></th><td>';
 		echo '<input id="ttfw-guestbook-token" type="password" class="regular-text" autocomplete="new-password" name="' . esc_attr( TTFW_Guestbook_Settings::OPTION_NAME . '[token]' ) . '" value="" placeholder="' . esc_attr( $has_token ? __( 'Stored - leave blank to keep unchanged', 'tornevall-tools-for-wordpress' ) : __( 'Paste guestbook token', 'tornevall-tools-for-wordpress' ) ) . '">';
-		echo '<p class="description">' . esc_html__( 'Use a Tools API key with guestbook.write and guestbook.moderate. The token is never sent to public JavaScript.', 'tornevall-tools-for-wordpress' ) . '</p></td></tr>';
+		echo '<p class="description">' . esc_html__( 'Use a Tools API key with guestbook.write and guestbook.moderate. Remote moderation is scoped to entries created by this exact token.', 'tornevall-tools-for-wordpress' ) . '</p></td></tr>';
+		echo '<tr><th scope="row"><label for="ttfw-turnstile-site-key">' . esc_html__( 'Turnstile site key', 'tornevall-tools-for-wordpress' ) . '</label></th><td>';
+		echo '<input id="ttfw-turnstile-site-key" type="text" class="regular-text" name="' . esc_attr( TTFW_Guestbook_Settings::OPTION_NAME . '[turnstile_site_key]' ) . '" value="' . esc_attr( (string) $options['turnstile_site_key'] ) . '">';
+		echo '<p class="description">' . esc_html( sprintf( __( 'Create or configure a Cloudflare Turnstile widget that allows hostname %s.', 'tornevall-tools-for-wordpress' ), $site_host ) ) . '</p></td></tr>';
+		echo '<tr><th scope="row"><label for="ttfw-turnstile-secret-key">' . esc_html__( 'Turnstile secret key', 'tornevall-tools-for-wordpress' ) . '</label></th><td>';
+		echo '<input id="ttfw-turnstile-secret-key" type="password" class="regular-text" autocomplete="new-password" name="' . esc_attr( TTFW_Guestbook_Settings::OPTION_NAME . '[turnstile_secret_key]' ) . '" value="" placeholder="' . esc_attr( $has_turnstile_secret ? __( 'Stored - leave blank to keep unchanged', 'tornevall-tools-for-wordpress' ) : __( 'Paste Turnstile secret key', 'tornevall-tools-for-wordpress' ) ) . '">';
+		echo '<p class="description">' . esc_html__( 'The secret is used only by WordPress PHP for Siteverify and is never exposed in HTML or JavaScript.', 'tornevall-tools-for-wordpress' ) . '</p></td></tr>';
 		echo '</tbody></table>';
 		submit_button( __( 'Save guestbook settings', 'tornevall-tools-for-wordpress' ) );
 		echo '</form>';
 
 		self::render_addons( $dnsbl );
 
-		echo '<hr><h2>' . esc_html__( 'Central guestbook entries', 'tornevall-tools-for-wordpress' ) . '</h2>';
+		echo '<hr><h2>' . esc_html__( 'Entries owned by this guestbook token', 'tornevall-tools-for-wordpress' ) . '</h2>';
 		if ( ! $has_token ) {
 			echo '<p>' . esc_html__( 'Configure a guestbook token above to load moderation data.', 'tornevall-tools-for-wordpress' ) . '</p></div>';
 			return;
@@ -93,9 +101,9 @@ class TTFW_Guestbook_Admin {
 	 */
 	public static function handle_visibility() {
 		self::require_admin_action( 'ttfw_guestbook_visibility' );
-		$entry_id  = isset( $_POST['entry_id'] ) ? absint( $_POST['entry_id'] ) : 0;
+		$entry_id   = isset( $_POST['entry_id'] ) ? absint( $_POST['entry_id'] ) : 0;
 		$is_visible = isset( $_POST['is_visible'] ) && '1' === (string) wp_unslash( $_POST['is_visible'] );
-		$result     = ( new TTFW_Guestbook_API() )->set_visibility( $entry_id, $is_visible );
+		$result      = ( new TTFW_Guestbook_API() )->set_visibility( $entry_id, $is_visible );
 		self::redirect_with_result( $result, $is_visible ? 'Entry restored.' : 'Entry hidden.' );
 	}
 
@@ -135,6 +143,8 @@ class TTFW_Guestbook_Admin {
 			$ip,
 			array(
 				'bitmask'     => 64,
+				'source_type' => 'wordpress_guestbook',
+				'source_name' => 'guestbook_admin',
 				'source_note' => 'Guestbook abuse reported from WordPress for central entry #' . $entry_id . '.',
 			),
 			array( 'consumer' => 'tornevall-tools-for-wordpress', 'feature' => 'guestbook-admin' )
@@ -222,7 +232,7 @@ class TTFW_Guestbook_Admin {
 			}
 			echo '</td><td>';
 			self::action_form( 'ttfw_guestbook_visibility', 'ttfw_guestbook_visibility', $id, $ip, ! empty( $entry['is_visible'] ) ? '0' : '1', ! empty( $entry['is_visible'] ) ? __( 'Hide', 'tornevall-tools-for-wordpress' ) : __( 'Restore', 'tornevall-tools-for-wordpress' ) );
-			if ( '' !== $ip && ! empty( $dnsbl['active'] ) ) {
+			if ( '' !== $ip && ! empty( $dnsbl['can_check'] ) ) {
 				self::action_form( 'ttfw_guestbook_dnsbl_check', 'ttfw_guestbook_dnsbl_check', $id, $ip, '', __( 'Check DNSBL', 'tornevall-tools-for-wordpress' ) );
 			}
 			if ( '' !== $ip && ! empty( $dnsbl['can_report'] ) ) {
@@ -259,13 +269,13 @@ class TTFW_Guestbook_Admin {
 	private static function render_addons( $dnsbl ) {
 		echo '<hr><h2>' . esc_html__( 'Recommended add-ons', 'tornevall-tools-for-wordpress' ) . '</h2>';
 		echo '<div style="border:1px solid #c3c4c7;background:#fff;padding:16px;max-width:900px"><h3 style="margin-top:0">Tornevall Networks DNSBL Implementation</h3>';
-		echo '<p>' . esc_html__( 'Optional DNSBL/FraudBL protection for guestbook visitor IP checks and explicit administrator abuse reporting.', 'tornevall-tools-for-wordpress' ) . '</p>';
+		echo '<p>' . esc_html__( 'Optional DNSBL/FraudBL protection. DNSBL checks and blacklist publication do not exist in this plugin unless the DNSBL addon is installed, active and permitted by its own token.', 'tornevall-tools-for-wordpress' ) . '</p>';
 
 		if ( ! empty( $dnsbl['active'] ) ) {
 			echo '<p><strong>' . esc_html__( 'Active.', 'tornevall-tools-for-wordpress' ) . '</strong> ';
 			echo ! empty( $dnsbl['can_report'] )
-				? esc_html__( 'The configured DNSBL token can report abuse.', 'tornevall-tools-for-wordpress' )
-				: esc_html__( 'DNSBL checks are available; blacklist reporting requires add permission on the DNSBL token.', 'tornevall-tools-for-wordpress' );
+				? esc_html__( 'The configured DNSBL token can publish abuse reports and their source TXT metadata.', 'tornevall-tools-for-wordpress' )
+				: esc_html__( 'DNSBL checks may be available; blacklist reporting requires add permission on the DNSBL token.', 'tornevall-tools-for-wordpress' );
 			echo '</p>';
 		} elseif ( ! empty( $dnsbl['plugin_file'] ) && current_user_can( 'activate_plugins' ) ) {
 			$url = wp_nonce_url( self_admin_url( 'plugins.php?action=activate&plugin=' . rawurlencode( (string) $dnsbl['plugin_file'] ) ), 'activate-plugin_' . $dnsbl['plugin_file'] );
