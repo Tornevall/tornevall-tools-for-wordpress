@@ -94,7 +94,13 @@ class TTFW_AI_Service {
 				array(
 					'timeout' => (int) $options['timeout'],
 					'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
-					'body'    => wp_json_encode( array( 'model' => $model, 'input' => $input ) ),
+					'body'    => wp_json_encode(
+						array(
+							'model' => $model,
+							'input' => $input,
+							'store' => false,
+						)
+					),
 				)
 			),
 			'openai'

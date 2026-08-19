@@ -13,7 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Extracts text from editor uploads without storing provider tokens or files.
  */
 class TTFW_Document_Extractor {
-	public const MAX_UPLOAD_BYTES = 10485760;
+	public const MAX_UPLOAD_BYTES          = 10485760;
+	public const MAX_EXTRACTED_ENTRY_BYTES = 2097152;
 
 	/**
 	 * Returns accepted file extensions and mime types.
@@ -120,7 +121,17 @@ class TTFW_Document_Extractor {
 		$parts = array( 'word/document.xml', 'word/footnotes.xml', 'word/endnotes.xml' );
 		$text  = '';
 		foreach ( $parts as $part ) {
-			$xml = $zip->getFromName( $part );
+			$stat = $zip->statName( $part );
+			if ( is_array( $stat ) && isset( $stat['size'] ) && (int) $stat['size'] > self::MAX_EXTRACTED_ENTRY_BYTES ) {
+				$zip->close();
+				return new WP_Error( 'ttfw_docx_entry_too_large', __( 'The DOCX document contains an extracted XML part that is too large to process safely.', 'tornevall-tools-for-wordpress' ), array( 'status' => 422 ) );
+			}
+
+			$xml = $zip->getFromName( $part, self::MAX_EXTRACTED_ENTRY_BYTES + 1 );
+			if ( false !== $xml && strlen( $xml ) > self::MAX_EXTRACTED_ENTRY_BYTES ) {
+				$zip->close();
+				return new WP_Error( 'ttfw_docx_entry_too_large', __( 'The DOCX document contains an extracted XML part that is too large to process safely.', 'tornevall-tools-for-wordpress' ), array( 'status' => 422 ) );
+			}
 			if ( false !== $xml ) {
 				$text .= "\n\n" . self::extract_docx_xml_text( $xml );
 			}
