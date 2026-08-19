@@ -14,17 +14,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class TTFW_Guestbook {
 	const DEFAULT_EMBED_URL = 'https://tools.tornevall.net/guestbook/embed.js';
+	const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
-	/**
-	 * Shortcode instance counter.
-	 *
-	 * @var int
-	 */
+	/** @var int */
 	private static $instance = 0;
 
 	/**
-	 * Registers WordPress hooks.
-	 *
 	 * @return void
 	 */
 	public static function init() {
@@ -32,11 +27,6 @@ class TTFW_Guestbook {
 	}
 
 	/**
-	 * Renders a guestbook target and, when configured, a local signing form.
-	 *
-	 * The browser posts only to the local WordPress REST endpoint. The Tools
-	 * guestbook API token is added later by PHP and is never exposed here.
-	 *
 	 * @param array<string,mixed> $atts Shortcode attributes.
 	 * @return string
 	 */
@@ -55,20 +45,18 @@ class TTFW_Guestbook {
 			$theme = 'tools';
 		}
 
-		$limit = absint( $atts['limit'] );
-		$limit = max( 1, min( 50, $limit ) );
+		$limit = max( 1, min( 50, absint( $atts['limit'] ) ) );
 
 		self::$instance++;
-		$target_id = sprintf( 'ttfw-guestbook-%d-%d', self::$instance, wp_rand( 1000, 999999 ) );
-		$form_id   = $target_id . '-form';
-		$embed_url = self::get_embed_url();
+		$target_id  = sprintf( 'ttfw-guestbook-%d-%d', self::$instance, wp_rand( 1000, 999999 ) );
+		$form_id    = $target_id . '-form';
 		$script_url = add_query_arg(
 			array(
 				'theme'  => $theme,
 				'limit'  => $limit,
 				'target' => $target_id,
 			),
-			$embed_url
+			self::get_embed_url()
 		);
 
 		wp_enqueue_script(
@@ -79,11 +67,21 @@ class TTFW_Guestbook {
 			true
 		);
 
-		if ( TTFW_Guestbook_API::configured() ) {
+		$api_configured = TTFW_Guestbook_API::configured();
+		$turnstile_configured = TTFW_Guestbook_Settings::turnstile_configured();
+
+		if ( $api_configured && $turnstile_configured ) {
+			wp_enqueue_script(
+				'cloudflare-turnstile',
+				self::TURNSTILE_SCRIPT_URL,
+				array(),
+				null,
+				true
+			);
 			wp_enqueue_script(
 				'ttfw-guestbook-form',
 				TTFW_URL . 'assets/guestbook.js',
-				array(),
+				array( 'cloudflare-turnstile' ),
 				TTFW_VERSION,
 				true
 			);
@@ -95,7 +93,12 @@ class TTFW_Guestbook {
 			esc_attr( $theme )
 		);
 
-		if ( ! TTFW_Guestbook_API::configured() ) {
+		if ( ! $api_configured ) {
+			return $html;
+		}
+
+		if ( ! $turnstile_configured ) {
+			$html .= '<p class="ttfw-guestbook-signing-disabled">' . esc_html__( 'Guestbook reading is available, but signing is disabled until Cloudflare Turnstile is configured for this WordPress site.', 'tornevall-tools-for-wordpress' ) . '</p>';
 			return $html;
 		}
 
@@ -111,6 +114,7 @@ class TTFW_Guestbook {
 		$html .= '<p><label>' . esc_html__( 'Home city', 'tornevall-tools-for-wordpress' ) . '<br><input type="text" name="homecity" maxlength="191"></label></p>';
 		$html .= '<p><label>' . esc_html__( 'Message', 'tornevall-tools-for-wordpress' ) . '<br><textarea name="message" required maxlength="10000" rows="6"></textarea></label></p>';
 		$html .= '<p style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true"><label>Company<input type="text" name="contact_company" tabindex="-1" autocomplete="off"></label></p>';
+		$html .= '<div class="cf-turnstile" data-sitekey="' . esc_attr( TTFW_Guestbook_Settings::turnstile_site_key() ) . '" data-action="guestbook"></div>';
 		$html .= '<p><button type="submit">' . esc_html__( 'Sign guestbook', 'tornevall-tools-for-wordpress' ) . '</button></p>';
 		$html .= '<div data-ttfw-guestbook-status role="status" aria-live="polite"></div>';
 		$html .= '</form>';
@@ -119,12 +123,6 @@ class TTFW_Guestbook {
 	}
 
 	/**
-	 * Returns the approved HTTPS guestbook embed endpoint.
-	 *
-	 * Developers can override this for staging through the
-	 * ttfw_guestbook_embed_url filter. Invalid or non-HTTPS values fall back
-	 * to the production Tools endpoint.
-	 *
 	 * @return string
 	 */
 	private static function get_embed_url() {
