@@ -1,8 +1,8 @@
 # Tornevall Tools for WordPress
 
-Tornevall Tools for WordPress adds a server-side AI connector layer to the WordPress block editor.
+Tornevall Tools for WordPress adds server-side AI connectors and Tornevall Networks Tools integrations to WordPress.
 
-The first implementation supports two providers:
+The AI implementation supports two providers:
 
 1. Tornevall Networks Tools AI through `https://tools.tornevall.net/api/ai/internal/respond`.
 2. Direct OpenAI access through the OpenAI Responses API.
@@ -11,7 +11,7 @@ The plugin is intentionally WordPress-native. API tokens are configured in wp-ad
 
 ## Current status
 
-Version `0.1.0` is the initial implementation.
+Version `0.1.1` adds the first public Tools integration outside the editor: an embeddable Tools guestbook shortcode.
 
 Implemented now:
 
@@ -24,6 +24,8 @@ Implemented now:
 - Block inserter block named `Tornevall AI Assistant` in the `Text` category.
 - Server-side REST endpoint at `/wp-json/ttfw/v1/ai/respond`.
 - Insert and replace controls for generated content.
+- Public `[tornevall_guestbook]` shortcode backed by the Tools guestbook JavaScript embed.
+- Guestbook themes: `tools`, `miazma`, and `terminal`.
 - Tokens are not localized to JavaScript.
 - Settings sanitization and output escaping.
 - REST permission callback based on `edit_posts`.
@@ -36,15 +38,62 @@ Not implemented yet:
 - Image generation.
 - Provider model discovery.
 - Automated test suite.
+- Native Gutenberg guestbook block. The shortcode is the first integration and test surface.
 
 ## Requirements
 
 - WordPress 6.5 or newer.
 - PHP 7.4 or newer.
-- A user with `manage_options` to configure the plugin.
-- Editor users need `edit_posts` to use the REST endpoint.
+- A user with `manage_options` to configure the AI connectors.
+- Editor users need `edit_posts` to use the AI REST endpoint.
 - For OpenAI direct mode: an OpenAI API key and model name.
 - For Tornevall Tools AI mode: a Tools bearer token with the correct AI scope for the configured endpoint.
+- For the guestbook shortcode: public HTTPS access to `tools.tornevall.net`.
+
+## Guestbook embed
+
+The plugin can embed the public Tools guestbook in any post, page, or widget area that processes WordPress shortcodes.
+
+Basic usage:
+
+```text
+[tornevall_guestbook]
+```
+
+Choose a theme and number of entries:
+
+```text
+[tornevall_guestbook theme="miazma" limit="10"]
+```
+
+Available themes:
+
+- `tools` - modern default styling.
+- `miazma` - modernized black and blue Miazmabook styling.
+- `terminal` - compact dark monospace styling.
+
+`limit` is clamped to 1-50 entries.
+
+The shortcode creates a unique target element and enqueues the Tools JavaScript entry at:
+
+```text
+https://tools.tornevall.net/guestbook/embed.js
+```
+
+The remote widget renders inside Shadow DOM, so the active WordPress theme should not alter the guestbook presentation. The embed contains public guestbook data only. E-mail addresses and AI/provider tokens are never included.
+
+For staging or local integration testing, developers can override the embed URL without adding an admin-facing setting:
+
+```php
+add_filter(
+    'ttfw_guestbook_embed_url',
+    static function () {
+        return 'https://staging.example.test/guestbook/embed.js';
+    }
+);
+```
+
+Only valid HTTPS URLs are accepted. Invalid overrides fall back to the production Tools endpoint.
 
 ## Provider behavior
 
@@ -64,7 +113,7 @@ The plugin sends the Tools-specific request shape:
   "context": "Selected block context and optional persona",
   "user_prompt": "Editor instruction",
   "client_name": "Tornevall Tools for WordPress",
-  "client_version": "0.1.0",
+  "client_version": "0.1.1",
   "client_platform": "wordpress"
 }
 ```
@@ -128,6 +177,8 @@ Available settings:
 - Admin output is escaped.
 - Settings and REST input are sanitized before use.
 - Remote requests use WordPress HTTP APIs.
+- The guestbook embed is public and token-free.
+- The guestbook embed URL must use HTTPS.
 
 ## Development structure
 
@@ -137,6 +188,7 @@ includes/class-ttfw-plugin.php      Hooks and editor asset loading
 includes/class-ttfw-settings.php    Settings API and sanitization
 includes/class-ttfw-rest-controller.php REST endpoint
 includes/class-ttfw-ai-service.php  Provider adapters
+includes/class-ttfw-guestbook.php   Public Tools guestbook shortcode integration
 assets/editor.js                    Block editor UI, no build step yet
 assets/editor.css                   Editor styles
 readme.txt                          WordPress.org-style plugin readme
@@ -150,9 +202,9 @@ uninstall.php                       Option cleanup on uninstall
 
 1. Copy the plugin directory to `wp-content/plugins/tornevall-tools-for-wordpress`.
 2. Activate `Tornevall Tools for WordPress` in wp-admin.
-3. Open `Settings -> Tornevall Tools AI`.
-4. Configure at least one provider token.
-5. Open the block editor and use `Tornevall AI` from the editor sidebar or insert the `Tornevall AI Assistant` block.
+3. Open `Settings -> Tornevall Tools AI` to configure AI providers when needed.
+4. Open the block editor and use `Tornevall AI` from the editor sidebar or insert the `Tornevall AI Assistant` block.
+5. To test the Tools guestbook, add `[tornevall_guestbook theme="miazma" limit="10"]` to a page and view the page on the frontend.
 
 ## Testing checklist
 
@@ -168,6 +220,11 @@ Before merging a change:
 - Confirm generated text can replace selected blocks.
 - Confirm users without `edit_posts` cannot call the REST endpoint.
 - Confirm settings are available only to `manage_options` users.
+- Add `[tornevall_guestbook]` to a public page and confirm the widget renders.
+- Test `tools`, `miazma`, and `terminal` themes.
+- Confirm an invalid shortcode theme falls back to `tools`.
+- Confirm `limit` stays within 1-50.
+- Confirm no provider token appears in the guestbook page source or network request.
 - Run PHP lint for all PHP files.
 - Run WordPress Coding Standards when available.
 
@@ -180,6 +237,7 @@ Before merging a change:
 5. Add support for per-role or per-user provider restrictions.
 6. Add opt-in request logging without storing secrets or full private post content.
 7. Add streaming once the provider and editor UX are ready.
+8. Promote the guestbook shortcode into a native Gutenberg block if the embed contract proves stable.
 
 ## License
 
