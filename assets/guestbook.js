@@ -8,6 +8,17 @@
 		return fallback;
 	}
 
+	function resetTurnstile( form ) {
+		if ( typeof window.turnstile !== 'object' || typeof window.turnstile.reset !== 'function' ) {
+			return;
+		}
+
+		var widget = form.querySelector( '.cf-turnstile' );
+		if ( widget ) {
+			window.turnstile.reset( widget );
+		}
+	}
+
 	function bindForm( form ) {
 		if ( form.dataset.ttfwGuestbookBound === '1' ) {
 			return;
@@ -65,6 +76,7 @@
 					}
 				} )
 				.finally( function () {
+					resetTurnstile( form );
 					if ( button ) {
 						button.disabled = false;
 					}
