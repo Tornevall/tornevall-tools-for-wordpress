@@ -18,8 +18,10 @@ class TTFW_Guestbook_Settings {
 	 */
 	public static function defaults() {
 		return array(
-			'api_url' => TTFW_Guestbook_API::DEFAULT_API_URL,
-			'token'   => '',
+			'api_url'               => TTFW_Guestbook_API::DEFAULT_API_URL,
+			'token'                 => '',
+			'turnstile_site_key'    => '',
+			'turnstile_secret_key'  => '',
 		);
 	}
 
@@ -66,14 +68,22 @@ class TTFW_Guestbook_Settings {
 			$url = self::defaults()['api_url'];
 		}
 
-		$token = isset( $input['token'] ) ? trim( sanitize_text_field( wp_unslash( (string) $input['token'] ) ) ) : '';
-		if ( '' === $token ) {
-			$token = (string) $current['token'];
-		}
+		$token = self::preserve_secret( $input, 'token', (string) $current['token'], 4000 );
+		$turnstile_site_key = isset( $input['turnstile_site_key'] )
+			? trim( sanitize_text_field( wp_unslash( (string) $input['turnstile_site_key'] ) ) )
+			: (string) $current['turnstile_site_key'];
+		$turnstile_secret_key = self::preserve_secret(
+			$input,
+			'turnstile_secret_key',
+			(string) $current['turnstile_secret_key'],
+			4000
+		);
 
 		return array(
-			'api_url' => $url,
-			'token'   => substr( $token, 0, 4000 ),
+			'api_url'              => $url,
+			'token'                => substr( $token, 0, 4000 ),
+			'turnstile_site_key'   => substr( $turnstile_site_key, 0, 4000 ),
+			'turnstile_secret_key' => substr( $turnstile_secret_key, 0, 4000 ),
 		);
 	}
 
@@ -89,5 +99,45 @@ class TTFW_Guestbook_Settings {
 	 */
 	public static function token() {
 		return (string) self::get_options()['token'];
+	}
+
+	/**
+	 * @return bool
+	 */
+	public static function turnstile_configured() {
+		return '' !== self::turnstile_site_key() && '' !== self::turnstile_secret_key();
+	}
+
+	/**
+	 * @return string
+	 */
+	public static function turnstile_site_key() {
+		return trim( (string) self::get_options()['turnstile_site_key'] );
+	}
+
+	/**
+	 * @return string
+	 */
+	public static function turnstile_secret_key() {
+		return trim( (string) self::get_options()['turnstile_secret_key'] );
+	}
+
+	/**
+	 * @param array<string,mixed> $input Raw settings input.
+	 * @param string              $key Settings key.
+	 * @param string              $current Current secret.
+	 * @param int                 $limit Maximum length.
+	 * @return string
+	 */
+	private static function preserve_secret( $input, $key, $current, $limit ) {
+		$value = isset( $input[ $key ] )
+			? trim( sanitize_text_field( wp_unslash( (string) $input[ $key ] ) ) )
+			: '';
+
+		if ( '' === $value ) {
+			$value = $current;
+		}
+
+		return substr( $value, 0, $limit );
 	}
 }
