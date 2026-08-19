@@ -49,7 +49,7 @@ class TTFW_API_Client {
 				'Accept'        => 'application/json',
 				'Authorization' => 'Bearer ' . $token,
 				'Content-Type'  => 'application/json',
-				'User-Agent'    => 'Tornevall-Tools-for-WordPress/' . TTFW_VERSION . '; ' . home_url( '/' ),
+				'User-Agent'    => 'Tornevall-Tools-for-WordPress/' . TTFW_VERSION,
 			),
 		);
 
