@@ -69,7 +69,7 @@ class TTFW_Tools_Connection_Admin {
 		echo '<h2 style="margin-top:0;">' . esc_html__( 'Tornevall Tools account', 'tornevall-tools-for-wordpress' ) . '</h2>';
 
 		if ( ! $connected ) {
-			echo '<p>' . esc_html__( 'Connect this WordPress installation to a logged-in Tornevall Tools account. Tools can then create dedicated site credentials for services you already have permission to use, instead of requiring you to copy existing tokens manually.', 'tornevall-tools-for-wordpress' ) . '</p>';
+			echo '<p>' . esc_html__( 'Connect this WordPress installation to a logged-in Tornevall Tools account. For DNSBL, Tools can rotate an existing token and install its new value here, or create a separate site token if you choose that during approval.', 'tornevall-tools-for-wordpress' ) . '</p>';
 			echo '<form action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" method="post" style="margin:12px 0 4px;">';
 			echo '<input type="hidden" name="action" value="ttfw_tools_connect" />';
 			wp_nonce_field( 'ttfw_tools_connect' );
@@ -109,25 +109,39 @@ class TTFW_Tools_Connection_Admin {
 		$available = ! empty( $status['available'] );
 		$details = array();
 		$permissions = isset( $status['permissions'] ) && is_array( $status['permissions'] ) ? $status['permissions'] : array();
+		$credential_mode = isset( $status['credential_mode'] ) ? sanitize_key( (string) $status['credential_mode'] ) : '';
 
 		if ( $available ) {
+			$mode_labels = array(
+				'rotated_existing' => __( 'existing token rotated', 'tornevall-tools-for-wordpress' ),
+				'created_copy'     => __( 'separate site token', 'tornevall-tools-for-wordpress' ),
+				'copied_from_admin'=> __( 'non-admin copy of admin permissions', 'tornevall-tools-for-wordpress' ),
+			);
+			if ( isset( $mode_labels[ $credential_mode ] ) ) {
+				$details[] = $mode_labels[ $credential_mode ];
+			}
+
 			$labels = array(
 				'allow_add'        => 'add',
 				'allow_delete'     => 'delete',
 				'allow_custom_txt' => 'custom TXT',
 				'allow_spam_check' => 'spam check',
 			);
+			$permission_labels = array();
 			foreach ( $labels as $key => $label ) {
 				if ( ! empty( $permissions[ $key ] ) ) {
-					$details[] = $label;
+					$permission_labels[] = $label;
 				}
+			}
+			if ( $permission_labels ) {
+				$details[] = implode( ', ', $permission_labels );
 			}
 		}
 
 		self::render_status_row(
 			'DNSBL / FraudBL',
 			$available,
-			$available ? implode( ', ', $details ) : self::reason_label( isset( $status['reason'] ) ? $status['reason'] : '' )
+			$available ? implode( ' - ', $details ) : self::reason_label( isset( $status['reason'] ) ? $status['reason'] : '' )
 		);
 	}
 
