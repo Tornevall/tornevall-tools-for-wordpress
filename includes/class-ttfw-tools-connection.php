@@ -87,7 +87,9 @@ class TTFW_Tools_Connection {
 		$pairing = get_transient( self::pairing_transient_key() );
 		$pairing = is_array( $pairing ) ? $pairing : array();
 		$returned_code = isset( $_GET['user_code'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['user_code'] ) ) : '';
-		$state = isset( $_GET['ttfw_connection'] ) ? sanitize_key( wp_unslash( (string) $_GET['ttfw_connection'] ) ) : '';
+		$state = isset( $_GET['tools_connection'] )
+			? sanitize_key( wp_unslash( (string) $_GET['tools_connection'] ) )
+			: ( isset( $_GET['ttfw_connection'] ) ? sanitize_key( wp_unslash( (string) $_GET['ttfw_connection'] ) ) : '' );
 
 		if ( empty( $pairing['device_code'] ) || empty( $pairing['user_code'] ) || '' === $returned_code || ! hash_equals( (string) $pairing['user_code'], $returned_code ) ) {
 			delete_transient( self::pairing_transient_key() );
@@ -208,6 +210,7 @@ class TTFW_Tools_Connection {
 			$status[ $service ] = array(
 				'available'       => ! empty( $data['available'] ),
 				'reason'          => isset( $data['reason'] ) ? sanitize_key( (string) $data['reason'] ) : '',
+				'credential_mode' => isset( $data['credential_mode'] ) ? sanitize_key( (string) $data['credential_mode'] ) : '',
 				'permissions'     => isset( $data['permissions'] ) && is_array( $data['permissions'] ) ? $data['permissions'] : array(),
 				'guestbook_count' => isset( $data['guestbook_count'] ) ? absint( $data['guestbook_count'] ) : 0,
 			);
@@ -238,6 +241,9 @@ class TTFW_Tools_Connection {
 			}
 			if ( isset( $remote['credential_id'] ) ) {
 				$entry['credential_id'] = absint( $remote['credential_id'] );
+			}
+			if ( isset( $remote['credential_mode'] ) && is_scalar( $remote['credential_mode'] ) ) {
+				$entry['credential_mode'] = sanitize_key( (string) $remote['credential_mode'] );
 			}
 			if ( isset( $remote['permissions'] ) && is_array( $remote['permissions'] ) ) {
 				$entry['permissions'] = self::sanitize_permissions( $remote['permissions'] );
