@@ -20,6 +20,8 @@ class TTFW_Guestbook_Settings {
 		return array(
 			'api_url'               => TTFW_Guestbook_API::DEFAULT_API_URL,
 			'token'                 => '',
+			'guestbook_id'          => '',
+			'guestbook_slug'        => '',
 			'turnstile_site_key'    => '',
 			'turnstile_secret_key'  => '',
 		);
@@ -69,6 +71,17 @@ class TTFW_Guestbook_Settings {
 		}
 
 		$token = self::preserve_secret( $input, 'token', (string) $current['token'], 4000 );
+		$token_was_replaced = isset( $input['token'] )
+			&& '' !== trim( sanitize_text_field( wp_unslash( (string) $input['token'] ) ) )
+			&& $token !== (string) $current['token'];
+
+		$guestbook_id = $token_was_replaced
+			? ''
+			: ( isset( $input['guestbook_id'] ) ? (string) absint( $input['guestbook_id'] ) : (string) $current['guestbook_id'] );
+		$guestbook_slug = $token_was_replaced
+			? ''
+			: ( isset( $input['guestbook_slug'] ) ? sanitize_key( wp_unslash( (string) $input['guestbook_slug'] ) ) : (string) $current['guestbook_slug'] );
+
 		$turnstile_site_key = isset( $input['turnstile_site_key'] )
 			? trim( sanitize_text_field( wp_unslash( (string) $input['turnstile_site_key'] ) ) )
 			: (string) $current['turnstile_site_key'];
@@ -82,6 +95,8 @@ class TTFW_Guestbook_Settings {
 		return array(
 			'api_url'              => $url,
 			'token'                => substr( $token, 0, 4000 ),
+			'guestbook_id'         => $guestbook_id,
+			'guestbook_slug'       => substr( $guestbook_slug, 0, 191 ),
 			'turnstile_site_key'   => substr( $turnstile_site_key, 0, 4000 ),
 			'turnstile_secret_key' => substr( $turnstile_secret_key, 0, 4000 ),
 		);
@@ -99,6 +114,45 @@ class TTFW_Guestbook_Settings {
 	 */
 	public static function token() {
 		return (string) self::get_options()['token'];
+	}
+
+	/**
+	 * @return int
+	 */
+	public static function guestbook_id() {
+		return absint( self::get_options()['guestbook_id'] );
+	}
+
+	/**
+	 * @return string
+	 */
+	public static function guestbook_slug() {
+		return sanitize_key( (string) self::get_options()['guestbook_slug'] );
+	}
+
+	/**
+	 * @return array<string,int|string>
+	 */
+	public static function selector() {
+		$id = self::guestbook_id();
+		if ( $id > 0 ) {
+			return array( 'guestbook_id' => $id );
+		}
+
+		$slug = self::guestbook_slug();
+		return '' !== $slug ? array( 'guestbook_slug' => $slug ) : array();
+	}
+
+	/**
+	 * @param int    $guestbook_id Remote guestbook id.
+	 * @param string $guestbook_slug Remote guestbook slug.
+	 * @return void
+	 */
+	public static function set_selected_guestbook( $guestbook_id, $guestbook_slug ) {
+		$options = self::get_options();
+		$options['guestbook_id']   = (string) absint( $guestbook_id );
+		$options['guestbook_slug'] = substr( sanitize_key( (string) $guestbook_slug ), 0, 191 );
+		update_option( self::OPTION_NAME, $options, false );
 	}
 
 	/**
