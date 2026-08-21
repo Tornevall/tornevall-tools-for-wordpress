@@ -21,6 +21,7 @@ class TTFW_Plugin {
 	public static function init() {
 		TTFW_Settings::init();
 		TTFW_Tools_Connection::init();
+		TTFW_Tools_Connection_Admin::init();
 		TTFW_Dynamic_DNS_Module::init();
 		TTFW_Guestbook_Settings::init();
 		TTFW_Guestbook::init();
