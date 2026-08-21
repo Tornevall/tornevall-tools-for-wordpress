@@ -1,0 +1,60 @@
+name: One-shot Plugin Check source patch
+
+on:
+  push:
+    branches:
+      - 'fix/18-plugin-check-baseline'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/18-plugin-check-baseline
+
+      - name: Apply source fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('includes/class-ttfw-guestbook-admin.php')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "\t\techo '<p class=\"description\">' . esc_html( sprintf( __( 'Create or configure a Cloudflare Turnstile widget that allows hostname %s.', 'tornevall-tools-for-wordpress' ), $site_host ) ) . '</p></td></tr>';",
+                  "\t\t// translators: %s: WordPress site hostname.\n\t\techo '<p class=\"description\">' . esc_html( sprintf( __( 'Create or configure a Cloudflare Turnstile widget that allows hostname %s.', 'tornevall-tools-for-wordpress' ), $site_host ) ) . '</p></td></tr>';",
+              ),
+              (
+                  "\t\t$message = ! empty( $result['listed'] )\n\t\t\t? sprintf( __( 'DNSBL: %1$s is listed with bitmask %2$d.', 'tornevall-tools-for-wordpress' ), $ip, (int) ( $result['bitmask'] ?? 0 ) )\n\t\t\t: sprintf( __( 'DNSBL: %s is not currently listed.', 'tornevall-tools-for-wordpress' ), $ip );",
+                  "\t\tif ( ! empty( $result['listed'] ) ) {\n\t\t\t// translators: 1: IP address, 2: DNSBL bitmask.\n\t\t\t$message = sprintf( __( 'DNSBL: %1$s is listed with bitmask %2$d.', 'tornevall-tools-for-wordpress' ), $ip, (int) ( $result['bitmask'] ?? 0 ) );\n\t\t} else {\n\t\t\t// translators: %s: IP address.\n\t\t\t$message = sprintf( __( 'DNSBL: %s is not currently listed.', 'tornevall-tools-for-wordpress' ), $ip );\n\t\t}",
+              ),
+              (
+                  "\t\techo esc_html( sprintf( __( 'Page %1$d of %2$d', 'tornevall-tools-for-wordpress' ), $current, $last ) );",
+                  "\t\t// translators: 1: current page number, 2: total number of pages.\n\t\techo esc_html( sprintf( __( 'Page %1$d of %2$d', 'tornevall-tools-for-wordpress' ), $current, $last ) );",
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'Expected source fragment not found: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Commit source fixes and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/fix-18-source.yml
+          git add includes/class-ttfw-guestbook-admin.php
+          git commit -m 'Fix Plugin Check translator comments'
+          git push origin HEAD:fix/18-plugin-check-baseline
