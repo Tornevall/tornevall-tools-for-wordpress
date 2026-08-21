@@ -166,11 +166,15 @@ class TTFW_Tools_Connection_Admin {
 	 * @return string
 	 */
 	private static function reason_label( $reason ) {
-		return match ( sanitize_key( (string) $reason ) ) {
-			'no_active_dnsbl_token' => __( 'No active DNSBL token was available on the connected Tools account.', 'tornevall-tools-for-wordpress' ),
-			'no_owned_guestbook' => __( 'The connected Tools account does not own an active guestbook.', 'tornevall-tools-for-wordpress' ),
-			default => __( 'No managed credential was granted.', 'tornevall-tools-for-wordpress' ),
-		};
+		$reason = sanitize_key( (string) $reason );
+		if ( 'no_active_dnsbl_token' === $reason ) {
+			return __( 'No active DNSBL token was available on the connected Tools account.', 'tornevall-tools-for-wordpress' );
+		}
+		if ( 'no_owned_guestbook' === $reason ) {
+			return __( 'The connected Tools account does not own an active guestbook.', 'tornevall-tools-for-wordpress' );
+		}
+
+		return __( 'No managed credential was granted.', 'tornevall-tools-for-wordpress' );
 	}
 
 	/**
