@@ -184,7 +184,7 @@ class TTFW_Guestbook_Connection_Admin {
 		$theme = sanitize_key( self::post_value( 'theme' ) );
 		$theme = in_array( $theme, array( 'tools', 'miazma', 'terminal' ), true ) ? $theme : 'tools';
 		$site_url = esc_url_raw( self::post_value( 'site_url' ) );
-		$site_description = TTFW_Settings::sanitize_long_text( self::post_value( 'site_description' ), 5000 );
+		$site_description = TTFW_Settings::limit_string( sanitize_textarea_field( self::post_value( 'site_description' ) ), 5000 );
 		$site_language = self::normalize_language( self::post_value( 'site_language' ) );
 
 		if ( strlen( trim( $name ) ) < 2 || '' === $slug ) {
