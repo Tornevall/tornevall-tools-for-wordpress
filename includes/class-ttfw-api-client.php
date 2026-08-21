@@ -16,7 +16,7 @@ class TTFW_API_Client {
 	public const BASE_URL = 'https://tools.tornevall.net';
 
 	/**
-	 * Sends a JSON request to a Tools API endpoint.
+	 * Sends an authenticated JSON request to a Tools API endpoint.
 	 *
 	 * @param string              $method HTTP method.
 	 * @param string              $path API path beginning with /api/.
@@ -25,6 +25,39 @@ class TTFW_API_Client {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public function request( $method, $path, $token, $body = array() ) {
+		$token = trim( (string) $token );
+		if ( '' === $token ) {
+			return new WP_Error( 'ttfw_missing_token', __( 'A Tools service token is required.', 'tornevall-tools-for-wordpress' ) );
+		}
+
+		return $this->send_request( $method, $path, $body, $token );
+	}
+
+	/**
+	 * Sends an unauthenticated JSON request to a public Tools API endpoint.
+	 *
+	 * This is intentionally separate from request() so existing service calls
+	 * cannot accidentally become unauthenticated when a token is missing.
+	 *
+	 * @param string              $method HTTP method.
+	 * @param string              $path API path beginning with /api/.
+	 * @param array<string,mixed> $body Optional JSON body.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	public function public_request( $method, $path, $body = array() ) {
+		return $this->send_request( $method, $path, $body, '' );
+	}
+
+	/**
+	 * Executes one JSON request against the fixed Tools origin.
+	 *
+	 * @param string              $method HTTP method.
+	 * @param string              $path API path beginning with /api/.
+	 * @param array<string,mixed> $body Optional JSON body.
+	 * @param string              $token Optional bearer token.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	private function send_request( $method, $path, $body, $token ) {
 		$method = strtoupper( sanitize_key( (string) $method ) );
 		$path   = '/' . ltrim( (string) $path, '/' );
 		$token  = trim( (string) $token );
@@ -37,20 +70,20 @@ class TTFW_API_Client {
 			return new WP_Error( 'ttfw_invalid_path', __( 'Invalid Tools API path.', 'tornevall-tools-for-wordpress' ) );
 		}
 
-		if ( '' === $token ) {
-			return new WP_Error( 'ttfw_missing_token', __( 'A Tools service token is required.', 'tornevall-tools-for-wordpress' ) );
+		$headers = array(
+			'Accept'       => 'application/json',
+			'Content-Type' => 'application/json',
+			'User-Agent'   => 'Tornevall-Tools-for-WordPress/' . TTFW_VERSION,
+		);
+		if ( '' !== $token ) {
+			$headers['Authorization'] = 'Bearer ' . $token;
 		}
 
 		$args = array(
 			'method'      => $method,
 			'timeout'     => 20,
 			'redirection' => 2,
-			'headers'     => array(
-				'Accept'        => 'application/json',
-				'Authorization' => 'Bearer ' . $token,
-				'Content-Type'  => 'application/json',
-				'User-Agent'    => 'Tornevall-Tools-for-WordPress/' . TTFW_VERSION,
-			),
+			'headers'     => $headers,
 		);
 
 		if ( 'POST' === $method ) {
@@ -86,7 +119,7 @@ class TTFW_API_Client {
 					$status
 				);
 			}
-			return new WP_Error( 'ttfw_tools_api_error', $message, array( 'status' => $status ) );
+			return new WP_Error( 'ttfw_tools_api_error', $message, array( 'status' => $status, 'response' => $data ) );
 		}
 
 		return $data;

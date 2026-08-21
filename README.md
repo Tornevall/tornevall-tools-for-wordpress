@@ -6,14 +6,39 @@ The plugin is the WordPress integration layer for Tools. It does not try to recr
 
 ## Current integrations
 
-Version `0.2.1` contains two complete Tools integrations:
+Version `0.2.2` contains the public Tools integrations and the new optional Tools account connection:
 
 - **Guestbook** - central Tools-backed guestbook with explicit per-site guestbook selection, shortcode rendering, owner-scoped reads/writes, moderation and Cloudflare Turnstile support.
 - **Dynamic DNS** - keep a Tornevall Networks Dynamic DNS hostname synchronized from WordPress manually or through WP-Cron.
+- **Tools account connection** - explicitly authorize this WordPress site from a logged-in Tools account and let Tools create dedicated site credentials for supported services.
 
 AI is not part of the current public runtime. The earlier AI implementation remains separate until it is ready to return as an optional integration.
 
-DNSBL/FraudBL is not duplicated in this plugin. Guestbook moderation can optionally use the bridge exposed by the separate Tornevall Networks DNSBL WordPress plugin when that plugin is installed and active.
+DNSBL/FraudBL is not duplicated in this plugin. When both plugins are installed, Tornevall Tools for WordPress can provide a managed DNSBL credential to the separate Tornevall Networks DNSBL WordPress plugin through a server-side filter. The DNSBL implementation itself remains in the DNSBL plugin.
+
+## Tools account connection
+
+Open **Tornevall Tools** in wp-admin and choose **Connect to Tornevall Tools**. Pairing is always an explicit administrator action.
+
+The flow is:
+
+1. WordPress asks the public Tools pairing endpoint for a short-lived device code.
+2. The administrator is redirected to `https://tools.tornevall.net` and signs in there.
+3. Tools shows the WordPress site and the services it wants to use.
+4. The administrator approves or denies the request.
+5. Tools creates dedicated credentials for this WordPress site. Existing raw service tokens are not sent to WordPress and are not reused.
+6. WordPress exchanges the device code server-to-server once and stores the granted site credentials locally.
+
+The wp-admin status card shows which managed services were granted and their permission metadata, but never displays the credentials themselves.
+
+Initial managed services are:
+
+- **DNSBL / FraudBL** - Tools can create a dedicated non-admin DNSBL credential based on an active DNSBL permission set owned by the logged-in Tools user. The standalone DNSBL plugin can consume it through the `tornevall_dnsbl_managed_api_token` filter when its own explicit token field is empty.
+- **Guestbook** - Tools can create an owner-scoped Guestbook credential when the logged-in user owns an active guestbook. The managed token is used automatically only when the manual Guestbook token is empty.
+
+Manual credentials remain explicit overrides. Dynamic DNS stays manually configured in this first pairing version because the current Dynamic DNS token model maintains a single primary user token and should not be silently rotated by a WordPress connection.
+
+Disconnecting removes the locally stored managed connection and credentials from WordPress.
 
 ## Guestbook
 
@@ -27,13 +52,13 @@ The default Tools Guestbook API base is:
 https://tools.tornevall.net/api/guestbook
 ```
 
-A Tools account may own more than one guestbook. After configuring the server-side Guestbook token, open **Tornevall Tools -> Guestbook connection**. WordPress requests the token owner's guestbook catalog from Tools only while that setup page is being used. Select the guestbook that belongs to this WordPress site.
+A Tools account may own more than one guestbook. After configuring a server-side Guestbook token, or connecting a Tools account that grants Guestbook access, open **Tornevall Tools -> Guestbook connection**. WordPress requests the token owner's guestbook catalog from Tools only while that setup page is being used. Select the guestbook that belongs to this WordPress site.
 
 The selected guestbook id/slug is stored locally and is added server-side to public list, public signing and admin moderation-list requests. Browser input cannot switch the configured guestbook.
 
-If the token has both `guestbook.write` and `guestbook.moderate`, the same connection page can create a new Tools guestbook and select it immediately. The initial Tools site context can include the WordPress URL, locale and a short description of the site and expected comments. The Tools user behind the token is always the owner; WordPress never supplies an owner id.
+If the effective token has both `guestbook.write` and `guestbook.moderate`, the same connection page can create a new Tools guestbook and select it immediately. The initial Tools site context can include the WordPress URL, locale and a short description of the site and expected comments. The Tools user behind the token is always the owner; WordPress never supplies an owner id.
 
-Replacing the configured Guestbook token clears the previous guestbook selection, preventing a selection from another Tools user from being reused accidentally.
+Replacing the manually configured Guestbook token clears the previous guestbook selection, preventing a selection from another Tools user from being reused accidentally.
 
 Basic shortcode:
 
@@ -86,13 +111,16 @@ Administrators can also run an immediate `Update now` request from wp-admin.
 
 ### Tornevall Networks Tools
 
-Tools is used for the Guestbook and Dynamic DNS integrations.
+Tools is used for account pairing, Guestbook and Dynamic DNS integrations.
 
 - Service: https://tools.tornevall.net/
+- WordPress pairing API: https://tools.tornevall.net/api/integrations/wordpress/device
 - Guestbook API: https://tools.tornevall.net/api/guestbook
 - Dynamic DNS documentation: https://tools.tornevall.net/docs/en/dynamic-dns
 - Terms: https://tools.tornevall.net/docs/en/terms-of-service
 - Privacy: https://tools.tornevall.net/docs/en/privacy-policy
+
+The account connection sends the WordPress site name, site URL, a callback URL and requested service names to Tools only after an administrator chooses to connect. The administrator then signs in and approves on Tools. Newly created managed credentials are returned only through a one-time server-to-server exchange and are stored in WordPress for server-side use.
 
 Guestbook and Dynamic DNS credentials are stored in WordPress and used by PHP for server-to-server requests. Guestbook setup may send selected/created guestbook metadata and the WordPress site's URL, locale and description to Tools when an administrator explicitly uses the Guestbook connection page.
 
@@ -123,7 +151,7 @@ The Turnstile secret remains server-side.
 
 - WordPress 6.5 or newer
 - PHP 7.4 or newer
-- Tornevall Networks Tools credentials for integrations that require authentication
+- A Tornevall Networks Tools account or manual credentials for integrations that require authentication
 - Cloudflare Turnstile credentials if public Guestbook signing is enabled
 
 ## Architecture
@@ -132,6 +160,8 @@ The Turnstile secret remains server-side.
 tornevall-tools-for-wordpress.php                         Main bootstrap
 includes/class-ttfw-settings.php                          Tools overview / Dynamic DNS settings
 includes/class-ttfw-api-client.php                        Shared fixed-origin Tools API client
+includes/class-ttfw-tools-connection.php                  Tools account pairing and managed credentials
+includes/class-ttfw-tools-connection-admin.php            Tools account status and connect/disconnect controls
 includes/class-ttfw-dynamic-dns-module.php                Dynamic DNS logic and WP-Cron
 includes/class-ttfw-module-registry.php                   Integration overview metadata
 includes/class-ttfw-guestbook-api.php                     Tools Guestbook server-side client

@@ -10,14 +10,17 @@ Current public integrations:
 
 1. Guestbook.
 2. Dynamic DNS.
+3. Optional Tools account pairing for managed service credentials.
 
-AI work remains separate until it is production-ready. DNSBL/FraudBL must not be reimplemented here because Tornevall Networks DNSBL has its own WordPress plugin. The Guestbook may use the standalone DNSBL plugin through its public WordPress bridge when that plugin is installed and active.
+AI work remains separate until it is production-ready. DNSBL/FraudBL must not be reimplemented here because Tornevall Networks DNSBL has its own WordPress plugin. The Guestbook may use the standalone DNSBL plugin through its public WordPress bridge when that plugin is installed and active. Tools account pairing may supply a site-specific DNSBL credential to that plugin, but this repository must still not implement DNSBL lookup/write behavior itself.
 
 ## Current architecture
 
 - `tornevall-tools-for-wordpress.php` loads the plugin runtime.
 - `TTFW_Settings` owns the Tornevall Tools overview and Dynamic DNS settings.
-- `TTFW_API_Client` is the fixed-origin server-side client for documented `tools.tornevall.net/api/*` endpoints.
+- `TTFW_API_Client` is the fixed-origin server-side client for documented `tools.tornevall.net/api/*` endpoints. Authenticated `request()` still requires a token. Public pairing calls use the separate `public_request()` method.
+- `TTFW_Tools_Connection` owns the explicit Tools account device flow, one-time exchange and locally stored managed service credentials.
+- `TTFW_Tools_Connection_Admin` renders the connect/disconnect controls and public-safe service status on the Tools overview page.
 - `TTFW_Dynamic_DNS_Module` owns Dynamic DNS updates and WP-Cron scheduling.
 - `TTFW_Guestbook_API`, `TTFW_Guestbook_REST`, `TTFW_Guestbook_Settings`, `TTFW_Guestbook`, `TTFW_Guestbook_Admin` and `TTFW_Guestbook_Connection_Admin` own the central Tools Guestbook integration.
 - `TTFW_Guestbook_Connection_Admin` is the explicit admin surface for listing the configured Tools user's guestbooks, selecting one for this WordPress installation and creating a new owned book when the token permits it.
@@ -32,6 +35,32 @@ Remote service use must be documented in `readme.txt`. Credentials stay server-s
 
 Do not make authenticated external requests merely because the plugin was activated.
 
+## Tools account pairing
+
+The account connection is opt-in. It must only start after a WordPress administrator explicitly chooses to connect.
+
+Current contract:
+
+1. WordPress sends site name, site URL, same-host callback URL and requested service names to `POST /api/integrations/wordpress/device`.
+2. The browser is redirected only to the fixed `https://tools.tornevall.net` origin.
+3. The administrator signs in to Tools and approves there.
+4. Tools creates dedicated site credentials instead of exposing an existing raw service token.
+5. WordPress exchanges the short-lived device code server-to-server exactly once through `POST /api/integrations/wordpress/token`.
+6. WordPress stores only the newly delegated service credentials and public-safe permission/status metadata.
+
+The raw device code is temporary and must stay in a short-lived user-scoped transient until the callback. It must not be printed in markup, notices or logs.
+
+The initial managed services are DNSBL/FraudBL and Guestbook. Dynamic DNS remains manually configured because the current Tools Dynamic DNS token service maintains one primary token per user and rotation can invalidate another client.
+
+Manual service credentials are explicit overrides. In particular:
+
+- `TTFW_Guestbook_Settings::token()` must return the manually configured Guestbook token first and use the managed Guestbook token only when the manual value is empty.
+- The standalone DNSBL plugin may consume the managed DNSBL token through `tornevall_dnsbl_managed_api_token` only when its own explicit token is absent.
+
+Never display managed credentials in wp-admin. Status UI may show service availability, scopes, guardrails or counts, but not token strings.
+
+Disconnecting currently removes the local connection and local managed credentials. If server-side revocation is added later, it must be an explicit authenticated Tools contract rather than a client-side guess based on token names.
+
 ## Guestbook
 
 Tools remains the authoritative guestbook database. WordPress proxies owner-scoped reads, writes and moderation through local REST endpoints so the Tools token stays server-side.
@@ -42,7 +71,7 @@ The Guestbook connection page may request `GET /api/guestbook/owned/books` only 
 
 Remote creation through `POST /api/guestbook/owned/books` is permitted only when Tools reports that the configured token can create. The current Tools contract requires the same token to have both `guestbook.write` and `guestbook.moderate`. New books are always owned by the Tools user behind the token; WordPress never sends or chooses an owner id.
 
-When the Guestbook token is replaced, clear the stored guestbook selection so a selection from the previous Tools user cannot be reused accidentally.
+When the manually configured Guestbook token is replaced, clear the stored guestbook selection so a selection from the previous Tools user cannot be reused accidentally.
 
 Public signing is protected by Cloudflare Turnstile when configured. The Turnstile secret stays server-side. The browser receives only the public site key and single-use challenge token. Each external WordPress installation supplies its own Turnstile configuration; the plugin must not ship a shared Tools Turnstile secret.
 
