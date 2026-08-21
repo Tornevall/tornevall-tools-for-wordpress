@@ -70,6 +70,7 @@ class TTFW_Guestbook_Admin {
 		echo '<p class="description">' . esc_html__( 'Use a Tools API key with guestbook.write and guestbook.moderate. Remote moderation is scoped to entries created by this exact token.', 'tornevall-tools-for-wordpress' ) . '</p></td></tr>';
 		echo '<tr><th scope="row"><label for="ttfw-turnstile-site-key">' . esc_html__( 'Turnstile site key', 'tornevall-tools-for-wordpress' ) . '</label></th><td>';
 		echo '<input id="ttfw-turnstile-site-key" type="text" class="regular-text" name="' . esc_attr( TTFW_Guestbook_Settings::OPTION_NAME . '[turnstile_site_key]' ) . '" value="' . esc_attr( (string) $options['turnstile_site_key'] ) . '">';
+		// translators: %s: WordPress site hostname.
 		echo '<p class="description">' . esc_html( sprintf( __( 'Create or configure a Cloudflare Turnstile widget that allows hostname %s.', 'tornevall-tools-for-wordpress' ), $site_host ) ) . '</p></td></tr>';
 		echo '<tr><th scope="row"><label for="ttfw-turnstile-secret-key">' . esc_html__( 'Turnstile secret key', 'tornevall-tools-for-wordpress' ) . '</label></th><td>';
 		echo '<input id="ttfw-turnstile-secret-key" type="password" class="regular-text" autocomplete="new-password" name="' . esc_attr( TTFW_Guestbook_Settings::OPTION_NAME . '[turnstile_secret_key]' ) . '" value="" placeholder="' . esc_attr( $has_turnstile_secret ? __( 'Stored - leave blank to keep unchanged', 'tornevall-tools-for-wordpress' ) : __( 'Paste Turnstile secret key', 'tornevall-tools-for-wordpress' ) ) . '">';
@@ -124,9 +125,13 @@ class TTFW_Guestbook_Admin {
 			self::redirect_notice( 'error', __( 'The DNSBL addon is not available.', 'tornevall-tools-for-wordpress' ) );
 		}
 
-		$message = ! empty( $result['listed'] )
-			? sprintf( __( 'DNSBL: %1$s is listed with bitmask %2$d.', 'tornevall-tools-for-wordpress' ), $ip, (int) ( $result['bitmask'] ?? 0 ) )
-			: sprintf( __( 'DNSBL: %s is not currently listed.', 'tornevall-tools-for-wordpress' ), $ip );
+		if ( ! empty( $result['listed'] ) ) {
+			// translators: 1: IP address, 2: DNSBL bitmask.
+			$message = sprintf( __( 'DNSBL: %1$s is listed with bitmask %2$d.', 'tornevall-tools-for-wordpress' ), $ip, (int) ( $result['bitmask'] ?? 0 ) );
+		} else {
+			// translators: %s: IP address.
+			$message = sprintf( __( 'DNSBL: %s is not currently listed.', 'tornevall-tools-for-wordpress' ), $ip );
+		}
 		self::redirect_notice( ! empty( $result['ok'] ) ? 'success' : 'error', $message );
 	}
 
@@ -339,6 +344,7 @@ class TTFW_Guestbook_Admin {
 		if ( $current > 1 ) {
 			echo '<a class="button" href="' . esc_url( add_query_arg( 'remote_page', $current - 1 ) ) . '">&larr; ' . esc_html__( 'Previous', 'tornevall-tools-for-wordpress' ) . '</a> ';
 		}
+		// translators: 1: current page number, 2: total number of pages.
 		echo esc_html( sprintf( __( 'Page %1$d of %2$d', 'tornevall-tools-for-wordpress' ), $current, $last ) );
 		if ( $current < $last ) {
 			echo ' <a class="button" href="' . esc_url( add_query_arg( 'remote_page', $current + 1 ) ) . '">' . esc_html__( 'Next', 'tornevall-tools-for-wordpress' ) . ' &rarr;</a>';
