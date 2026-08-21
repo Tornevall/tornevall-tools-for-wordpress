@@ -4,11 +4,27 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added an explicit Tools account pairing flow from wp-admin. The administrator is sent to `tools.tornevall.net`, signs in there and approves the WordPress installation before any managed credential is issued.
+- Added site-specific managed credentials for DNSBL/FraudBL and Guestbook through the Tools pairing API.
+- Added the optional `tornevall_dnsbl_managed_api_token` server-side filter bridge for the separate DNSBL WordPress plugin.
+- Added a Tools account status card that shows granted services and permission metadata without rendering raw credentials.
+
 ### Changed
 
+- Guestbook uses a managed Tools credential automatically when no manual Guestbook token is configured. A manual token remains the explicit override.
+- The shared Tools API client now has a separate unauthenticated request method used only for the public pairing endpoints; authenticated service requests still require a token.
 - Updated the WordPress.org `Tested up to` value to 7.1 after exercising that version through the official Plugin Check runner.
 - Added translator context for placeholder-based Guestbook admin strings and versioned the Turnstile script enqueue.
 - Kept Cloudflare Turnstile as an explicitly documented external service while narrowing the Plugin Check exception to its exact offloaded-content diagnostic code.
+
+### Security and privacy
+
+- Existing service token values are never requested from the Tools account pairing flow. Tools creates dedicated credentials for this WordPress site instead.
+- Pairing state is kept in a short-lived per-admin transient and credential exchange happens server-to-server.
+- Managed credentials remain server-side and are never displayed in wp-admin HTML or browser JavaScript.
+- Connecting to Tools is an explicit administrator action; plugin activation does not start pairing or make authenticated account requests.
 
 ## [0.2.1] - 2026-08-21
 
