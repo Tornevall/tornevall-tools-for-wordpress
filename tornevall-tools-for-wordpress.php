@@ -28,6 +28,7 @@ define( 'TTFW_URL', plugin_dir_url( __FILE__ ) );
 require_once TTFW_PATH . 'includes/class-ttfw-api-client.php';
 require_once TTFW_PATH . 'includes/class-ttfw-settings.php';
 require_once TTFW_PATH . 'includes/class-ttfw-tools-connection.php';
+require_once TTFW_PATH . 'includes/class-ttfw-tools-connection-admin.php';
 require_once TTFW_PATH . 'includes/class-ttfw-dynamic-dns-module.php';
 require_once TTFW_PATH . 'includes/class-ttfw-guestbook-api.php';
 require_once TTFW_PATH . 'includes/class-ttfw-guestbook-settings.php';
