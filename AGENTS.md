@@ -19,7 +19,8 @@ AI work remains separate until it is production-ready. DNSBL/FraudBL must not be
 - `TTFW_Settings` owns the Tornevall Tools overview and Dynamic DNS settings.
 - `TTFW_API_Client` is the fixed-origin server-side client for documented `tools.tornevall.net/api/*` endpoints.
 - `TTFW_Dynamic_DNS_Module` owns Dynamic DNS updates and WP-Cron scheduling.
-- `TTFW_Guestbook_API`, `TTFW_Guestbook_REST`, `TTFW_Guestbook_Settings`, `TTFW_Guestbook` and `TTFW_Guestbook_Admin` own the central Tools Guestbook integration.
+- `TTFW_Guestbook_API`, `TTFW_Guestbook_REST`, `TTFW_Guestbook_Settings`, `TTFW_Guestbook`, `TTFW_Guestbook_Admin` and `TTFW_Guestbook_Connection_Admin` own the central Tools Guestbook integration.
+- `TTFW_Guestbook_Connection_Admin` is the explicit admin surface for listing the configured Tools user's guestbooks, selecting one for this WordPress installation and creating a new owned book when the token permits it.
 - `TTFW_Module_Registry` exposes integration status for the Tools overview.
 - Guestbook frontend JavaScript is packaged locally as `assets/guestbook.js`.
 
@@ -35,7 +36,15 @@ Do not make authenticated external requests merely because the plugin was activa
 
 Tools remains the authoritative guestbook database. WordPress proxies owner-scoped reads, writes and moderation through local REST endpoints so the Tools token stays server-side.
 
-Public signing is protected by Cloudflare Turnstile when configured. The Turnstile secret stays server-side. The browser receives only the public site key and single-use challenge token.
+A configured token identifies one Tools user, but a Tools user may own multiple guestbooks. WordPress therefore stores an explicit selected guestbook id/slug after the administrator chooses a book on the Guestbook connection page. That stored selector must be added server-side to public read/write and admin-list requests. Browser input must never be allowed to override the selected Tools guestbook.
+
+The Guestbook connection page may request `GET /api/guestbook/owned/books` only when an administrator actually opens that setup surface or performs an explicit connection action. Do not fetch the catalog merely because the plugin was activated.
+
+Remote creation through `POST /api/guestbook/owned/books` is permitted only when Tools reports that the configured token can create. The current Tools contract requires the same token to have both `guestbook.write` and `guestbook.moderate`. New books are always owned by the Tools user behind the token; WordPress never sends or chooses an owner id.
+
+When the Guestbook token is replaced, clear the stored guestbook selection so a selection from the previous Tools user cannot be reused accidentally.
+
+Public signing is protected by Cloudflare Turnstile when configured. The Turnstile secret stays server-side. The browser receives only the public site key and single-use challenge token. Each external WordPress installation supplies its own Turnstile configuration; the plugin must not ship a shared Tools Turnstile secret.
 
 The optional DNSBL controls are integration points into the separate Tornevall DNSBL WordPress plugin. Do not copy DNSBL lookup/reporting implementation into this repository.
 
