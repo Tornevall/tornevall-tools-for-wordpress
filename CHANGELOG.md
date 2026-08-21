@@ -7,12 +7,15 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 ### Added
 
 - Added an explicit Tools account pairing flow from wp-admin. The administrator is sent to `tools.tornevall.net`, signs in there and approves the WordPress installation before any managed credential is issued.
-- Added site-specific managed credentials for DNSBL/FraudBL and Guestbook through the Tools pairing API.
+- Added DNSBL/FraudBL account pairing that can select an existing active non-admin token, rotate it in place and return its new secret directly to this WordPress installation through the one-time server-side exchange.
+- Added an explicit alternative on the Tools approval page for creating a separate non-admin DNSBL site token instead of rotating the selected token.
+- Added Guestbook managed credentials through the same Tools pairing API.
 - Added the optional `tornevall_dnsbl_managed_api_token` server-side filter bridge for the separate DNSBL WordPress plugin.
-- Added a Tools account status card that shows granted services and permission metadata without rendering raw credentials.
+- Added a Tools account status card that shows granted services, DNSBL credential mode and permission metadata without rendering raw credentials.
 
 ### Changed
 
+- The pairing client now accepts the generic `tools_connection` callback state while retaining compatibility with the original `ttfw_connection` field.
 - Guestbook uses a managed Tools credential automatically when no manual Guestbook token is configured. A manual token remains the explicit override.
 - The shared Tools API client now has a separate unauthenticated request method used only for the public pairing endpoints; authenticated service requests still require a token.
 - Updated the WordPress.org `Tested up to` value to 7.1 after exercising that version through the official Plugin Check runner.
@@ -21,10 +24,12 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Security and privacy
 
-- Existing service token values are never requested from the Tools account pairing flow. Tools creates dedicated credentials for this WordPress site instead.
+- Existing DNSBL token secrets are never displayed or returned before rotation. When rotation is approved, Tools generates a new secret, invalidates the previous one and returns only the new value once.
+- Admin DNSBL tokens are never installed directly in WordPress. Selecting one causes Tools to create a non-admin copy of its effective DNSBL permissions instead.
 - Pairing state is kept in a short-lived per-admin transient and credential exchange happens server-to-server.
 - Managed credentials remain server-side and are never displayed in wp-admin HTML or browser JavaScript.
 - Connecting to Tools is an explicit administrator action; plugin activation does not start pairing or make authenticated account requests.
+- Rotating an existing token may require other clients using its previous value to be updated; Tools warns about this before approval.
 
 ## [0.2.1] - 2026-08-21
 
