@@ -24,6 +24,7 @@ class TTFW_Plugin {
 		TTFW_Guestbook_Settings::init();
 		TTFW_Guestbook::init();
 		TTFW_Guestbook_Admin::init();
+		TTFW_Guestbook_Connection_Admin::init();
 
 		add_action( 'plugins_loaded', array( __CLASS__, 'load_textdomain' ) );
 		add_action( 'rest_api_init', array( 'TTFW_Guestbook_REST', 'register_routes' ) );
