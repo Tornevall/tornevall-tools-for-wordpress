@@ -110,10 +110,18 @@ class TTFW_Guestbook_Settings {
 	}
 
 	/**
+	 * Returns the explicit Guestbook token when configured, otherwise the
+	 * site-specific managed token created by the Tools account connection.
+	 *
 	 * @return string
 	 */
 	public static function token() {
-		return (string) self::get_options()['token'];
+		$manual = trim( (string) self::get_options()['token'] );
+		if ( '' !== $manual ) {
+			return $manual;
+		}
+
+		return class_exists( 'TTFW_Tools_Connection' ) ? TTFW_Tools_Connection::managed_token( 'guestbook' ) : '';
 	}
 
 	/**
