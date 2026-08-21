@@ -57,7 +57,7 @@ class TTFW_Guestbook {
 					'cloudflare-turnstile',
 					self::TURNSTILE_SCRIPT_URL,
 					array(),
-					null,
+					TTFW_VERSION,
 					true
 				);
 				$dependencies[] = 'cloudflare-turnstile';

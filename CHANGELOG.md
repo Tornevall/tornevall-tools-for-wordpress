@@ -2,6 +2,14 @@
 
 All notable changes to Tornevall Tools for WordPress are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Updated the WordPress.org `Tested up to` value to 7.1 after exercising that version through the official Plugin Check runner.
+- Added translator context for placeholder-based Guestbook admin strings and versioned the Turnstile script enqueue.
+- Kept Cloudflare Turnstile as an explicitly documented external service while narrowing the Plugin Check exception to its exact offloaded-content diagnostic code.
+
 ## [0.2.1] - 2026-08-21
 
 ### Added
