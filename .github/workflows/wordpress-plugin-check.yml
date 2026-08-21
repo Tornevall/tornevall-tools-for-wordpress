@@ -10,68 +10,6 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-
-concurrency:
-  group: wordpress-plugin-check-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
-  plugin-check:
-    name: WordPress Plugin Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out plugin
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-
-      - name: Apply one-time Plugin Check source fixes
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/18-plugin-check-baseline'
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('includes/class-ttfw-guestbook-admin.php')
-          text = path.read_text()
-
-          replacements = [
-              (
-                  "\t\techo '<p class=\"description\">' . esc_html( sprintf( __( 'Create or configure a Cloudflare Turnstile widget that allows hostname %s.', 'tornevall-tools-for-wordpress' ), $site_host ) ) . '</p></td></tr>';",
-                  "\t\t// translators: %s: WordPress site hostname.\n\t\techo '<p class=\"description\">' . esc_html( sprintf( __( 'Create or configure a Cloudflare Turnstile widget that allows hostname %s.', 'tornevall-tools-for-wordpress' ), $site_host ) ) . '</p></td></tr>';",
-              ),
-              (
-                  "\t\t$message = ! empty( $result['listed'] )\n\t\t\t? sprintf( __( 'DNSBL: %1$s is listed with bitmask %2$d.', 'tornevall-tools-for-wordpress' ), $ip, (int) ( $result['bitmask'] ?? 0 ) )\n\t\t\t: sprintf( __( 'DNSBL: %s is not currently listed.', 'tornevall-tools-for-wordpress' ), $ip );",
-                  "\t\tif ( ! empty( $result['listed'] ) ) {\n\t\t\t// translators: 1: IP address, 2: DNSBL bitmask.\n\t\t\t$message = sprintf( __( 'DNSBL: %1$s is listed with bitmask %2$d.', 'tornevall-tools-for-wordpress' ), $ip, (int) ( $result['bitmask'] ?? 0 ) );\n\t\t} else {\n\t\t\t// translators: %s: IP address.\n\t\t\t$message = sprintf( __( 'DNSBL: %s is not currently listed.', 'tornevall-tools-for-wordpress' ), $ip );\n\t\t}",
-              ),
-              (
-                  "\t\techo esc_html( sprintf( __( 'Page %1$d of %2$d', 'tornevall-tools-for-wordpress' ), $current, $last ) );",
-                  "\t\t// translators: 1: current page number, 2: total number of pages.\n\t\techo esc_html( sprintf( __( 'Page %1$d of %2$d', 'tornevall-tools-for-wordpress' ), $current, $last ) );",
-              ),
-          ]
-
-          for old, new in replacements:
-              if old in text:
-                  text = text.replace(old, new, 1)
-              elif new not in text:
-                  raise SystemExit(f'Expected source fragment not found: {old[:80]!r}')
-
-          path.write_text(text)
-
-          final_workflow = """name: WordPress Plugin Check
-
-on:
-  pull_request:
-    branches:
-      - 'main'
-  push:
-    branches:
-      - 'main'
-  workflow_dispatch:
-
-permissions:
   contents: read
 
 concurrency:
@@ -95,31 +33,4 @@ jobs:
           # Cloudflare Turnstile is an explicitly documented external service.
           # Ignore only Plugin Check's generic offloaded-content code; all other
           # current and future errors remain blocking.
-          ignore-codes: PluginCheck.CodeAnalysis.Offloading.OffloadedContent
-"""
-          Path('.github/workflows/wordpress-plugin-check.yml').write_text(final_workflow)
-          one_shot = Path('.github/workflows/fix-18-source.yml')
-          if one_shot.exists():
-              one_shot.unlink()
-          PY
-
-      - name: Persist source cleanup
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/18-plugin-check-baseline'
-        shell: bash
-        run: |
-          if git diff --quiet; then
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add includes/class-ttfw-guestbook-admin.php .github/workflows/wordpress-plugin-check.yml
-          git add -u .github/workflows/fix-18-source.yml
-          git commit -m 'Fix Plugin Check translator comments'
-          git push origin HEAD:${{ github.head_ref }}
-
-      - name: Run WordPress Plugin Check
-        uses: wordpress/plugin-check-action@v1
-        with:
-          build-dir: './'
-          strict: false
           ignore-codes: PluginCheck.CodeAnalysis.Offloading.OffloadedContent
