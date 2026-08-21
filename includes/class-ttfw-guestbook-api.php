@@ -98,10 +98,15 @@ class TTFW_Guestbook_API {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public function set_visibility( $entry_id, $is_visible ) {
+		$payload = array_merge(
+			array( 'is_visible' => (bool) $is_visible ),
+			TTFW_Guestbook_Settings::selector()
+		);
+
 		return $this->request(
 			'PATCH',
 			'/admin/entries/' . absint( $entry_id ) . '/visibility',
-			array( 'is_visible' => (bool) $is_visible )
+			$payload
 		);
 	}
 
