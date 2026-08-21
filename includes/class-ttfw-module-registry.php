@@ -21,9 +21,12 @@ class TTFW_Module_Registry {
 	public static function all() {
 		$options = TTFW_Settings::get_options();
 		$guestbook_configured = TTFW_Guestbook_API::configured();
+		$guestbook_selected = TTFW_Guestbook_Settings::guestbook_id() > 0 || '' !== TTFW_Guestbook_Settings::guestbook_slug();
 		$guestbook_status = __( 'Needs configuration', 'tornevall-tools-for-wordpress' );
 
-		if ( $guestbook_configured ) {
+		if ( $guestbook_configured && ! $guestbook_selected ) {
+			$guestbook_status = __( 'Token configured; select a guestbook', 'tornevall-tools-for-wordpress' );
+		} elseif ( $guestbook_configured ) {
 			$guestbook_status = TTFW_Guestbook_Settings::turnstile_configured()
 				? __( 'Configured', 'tornevall-tools-for-wordpress' )
 				: __( 'Configured for reading; signing disabled', 'tornevall-tools-for-wordpress' );
@@ -33,7 +36,7 @@ class TTFW_Module_Registry {
 			'guestbook' => array(
 				'name'        => __( 'Guestbook', 'tornevall-tools-for-wordpress' ),
 				'description' => __( 'Owner-scoped Tornevall Networks Tools guestbook with public display, signing and moderation.', 'tornevall-tools-for-wordpress' ),
-				'enabled'     => $guestbook_configured,
+				'enabled'     => $guestbook_configured && $guestbook_selected,
 				'status'      => $guestbook_status,
 			),
 			'dynamic-dns' => array(

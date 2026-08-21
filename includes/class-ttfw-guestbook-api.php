@@ -33,10 +33,29 @@ class TTFW_Guestbook_API {
 	}
 
 	/**
+	 * @return array<string,mixed>|WP_Error
+	 */
+	public function owned_books() {
+		return $this->request( 'GET', '/owned/books' );
+	}
+
+	/**
+	 * @param array<string,mixed> $payload Guestbook create payload.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	public function create_owned_book( $payload ) {
+		return $this->request( 'POST', '/owned/books', is_array( $payload ) ? $payload : array() );
+	}
+
+	/**
 	 * @param array<string,mixed> $query Public listing query.
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public function owned_entries( $query = array() ) {
+		$query = array_merge(
+			is_array( $query ) ? $query : array(),
+			TTFW_Guestbook_Settings::selector()
+		);
 		$path = '/owned/entries';
 		if ( ! empty( $query ) ) {
 			$path = add_query_arg( $query, $path );
@@ -49,6 +68,11 @@ class TTFW_Guestbook_API {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public function submit( $payload ) {
+		$payload = array_merge(
+			is_array( $payload ) ? $payload : array(),
+			TTFW_Guestbook_Settings::selector()
+		);
+
 		return $this->request( 'POST', '/entries', $payload );
 	}
 
@@ -57,6 +81,10 @@ class TTFW_Guestbook_API {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public function admin_entries( $query = array() ) {
+		$query = array_merge(
+			is_array( $query ) ? $query : array(),
+			TTFW_Guestbook_Settings::selector()
+		);
 		$path = '/admin/entries';
 		if ( ! empty( $query ) ) {
 			$path = add_query_arg( $query, $path );
@@ -70,10 +98,15 @@ class TTFW_Guestbook_API {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public function set_visibility( $entry_id, $is_visible ) {
+		$payload = array_merge(
+			array( 'is_visible' => (bool) $is_visible ),
+			TTFW_Guestbook_Settings::selector()
+		);
+
 		return $this->request(
 			'PATCH',
 			'/admin/entries/' . absint( $entry_id ) . '/visibility',
-			array( 'is_visible' => (bool) $is_visible )
+			$payload
 		);
 	}
 

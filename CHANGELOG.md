@@ -10,6 +10,27 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 - Added translator context for placeholder-based Guestbook admin strings and versioned the Turnstile script enqueue.
 - Kept Cloudflare Turnstile as an explicitly documented external service while narrowing the Plugin Check exception to its exact offloaded-content diagnostic code.
 
+## [0.2.1] - 2026-08-21
+
+### Added
+
+- Added a dedicated **Tornevall Tools -> Guestbook connection** page that loads the configured Tools user's owned guestbooks on demand.
+- Added explicit selection of the one Tools guestbook used by this WordPress installation.
+- Added remote guestbook creation when the configured token has both `guestbook.write` and `guestbook.moderate`.
+- New remotely created guestbooks can initialize Tools site context from the WordPress URL, locale and site description.
+
+### Changed
+
+- Public guestbook reads, submissions and WordPress moderation listings now add the stored guestbook selector server-side, so multiple guestbooks owned by one Tools account stay isolated.
+- Replacing the Guestbook token clears the previous guestbook selection.
+- The Tools module overview now distinguishes a configured token from a completed guestbook selection.
+
+### Security and privacy
+
+- The selected guestbook cannot be overridden from public browser input.
+- Guestbook catalog/creation requests are made only from explicit admin setup actions; plugin activation does not make authenticated guestbook catalog requests.
+- Tools and Turnstile credentials remain server-side, and each WordPress installation continues to use its own Turnstile configuration.
+
 ## [0.2.0] - 2026-08-19
 
 ### Added
