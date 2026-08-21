@@ -30,3 +30,7 @@ jobs:
         with:
           build-dir: './'
           strict: false
+          # Cloudflare Turnstile is an explicitly documented external service.
+          # Ignore only Plugin Check's generic offloaded-content code; all other
+          # current and future errors remain blocking.
+          ignore-codes: PluginCheck.CodeAnalysis.Offloading.OffloadedContent
