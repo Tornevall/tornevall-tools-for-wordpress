@@ -6,11 +6,12 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Added
 
+- Added a native dynamic Gutenberg block for Statuspage under a Tornevall Tools block category, with an editor control for recent resolved incident history.
 - Added a first-class Statuspage integration backed by the Tornevall Tools public Status Platform API (`/api/status/v1/pages/{slug}`).
 - Added a dedicated **Tornevall Tools -> Statuspage** setup and diagnostics page.
 - Added `[tornevall_statuspage]` rendering for overall state, components, active incidents and incident timelines, with optional resolved incident history through `history="1"`.
 - Added a bounded live cache and a persistent last-successful snapshot so temporary Tools/API failures can fall back to stale data.
-- Added focused deterministic Statuspage contract tests to the existing PHP 7.4/8.4 CI matrix.
+- Added focused deterministic Statuspage contract and Gutenberg block tests to the existing PHP 7.4/8.4 CI matrix.
 - Added an explicit Tools account pairing flow from wp-admin. The administrator is sent to `tools.tornevall.net`, signs in there and approves the WordPress installation before any managed credential is issued.
 - Added DNSBL/FraudBL account pairing that can select an existing active non-admin token, rotate it in place and return its new secret directly to this WordPress installation through the one-time server-side exchange.
 - Added an explicit alternative on the Tools approval page for creating a separate non-admin DNSBL site token instead of rotating the selected token.
@@ -20,6 +21,8 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Changed
 
+- Statuspage shortcode and Gutenberg block now share one canonical PHP renderer so cache, incident history and outage semantics cannot drift between editor surfaces.
+- The Statuspage block editor is presentation-only and does not make Status Platform API requests merely because an editor opens a post.
 - Statuspage health semantics now reserve `major_outage`/critical presentation for a confirmed remote outage. Missing configuration is neutral, unknown state remains unknown, and communication failures use stale/unavailable state instead of being promoted to an outage.
 - Bumped the development version to 0.3.0 for the Statuspage integration.
 - The pairing client now accepts the generic `tools_connection` callback state while retaining compatibility with the original `ttfw_connection` field.
