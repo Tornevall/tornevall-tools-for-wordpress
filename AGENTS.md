@@ -26,7 +26,8 @@ AI work remains separate until it is production-ready. DNSBL/FraudBL must not be
 - `TTFW_Guestbook_API`, `TTFW_Guestbook_REST`, `TTFW_Guestbook_Settings`, `TTFW_Guestbook`, `TTFW_Guestbook_Admin` and `TTFW_Guestbook_Connection_Admin` own the central Tools Guestbook integration.
 - `TTFW_Statuspage_Settings` owns the configured public status-page slug and bounded live-cache TTL.
 - `TTFW_Statuspage_API` consumes and validates the versioned public Status Platform contract at `/api/status/v1/pages/{slug}`.
-- `TTFW_Statuspage` owns last-good caching, health semantics and `[tornevall_statuspage]` rendering.
+- `TTFW_Statuspage` owns last-good caching, health semantics, the canonical Statuspage renderer, `[tornevall_statuspage]`, and the dynamic Gutenberg block registration.
+- `blocks/statuspage/block.json` and `blocks/statuspage/index.js` define the Statuspage block metadata and editor-only UI.
 - `TTFW_Statuspage_Admin` renders the Statuspage setup and diagnostics surface.
 - `TTFW_Module_Registry` exposes integration status for the Tools overview.
 - Guestbook frontend JavaScript is packaged locally as `assets/guestbook.js`.
@@ -38,6 +39,18 @@ Each integration should solve one independently useful WordPress problem and onl
 Remote service use must be documented in `readme.txt`. Credentials stay server-side. State-changing admin actions require capability checks and nonces. Public REST routes need explicit permission behavior and strict validation.
 
 Do not make authenticated external requests merely because the plugin was activated.
+
+## Gutenberg blocks
+
+Blocks for Tools integrations should be thin WordPress editor surfaces over the integration's canonical PHP/service layer whenever server-rendering is sufficient.
+
+- Use `block.json` metadata and normal WordPress block registration.
+- Keep executable editor JavaScript packaged locally with the plugin.
+- Do not duplicate remote clients, caches, authorization, normalization or business/status semantics in block JavaScript.
+- Prefer dynamic/server-rendered blocks when the equivalent shortcode or PHP renderer already exists.
+- A block and its shortcode compatibility surface must share the same canonical renderer rather than maintaining parallel HTML implementations.
+- Editor placeholders and inspector controls should not cause remote Tools requests merely because an editor opens a post.
+- Browser-side ToolsAPI requests require an explicit contract/security reason and must never expose server-side Tools credentials.
 
 ## Statuspage
 
@@ -64,7 +77,8 @@ The configured status slug must remain a constrained identifier and must never b
 
 Public Statuspage rendering must not expose Tools bearer credentials. The current public endpoint needs no bearer token. Any future owner-scoped configuration/catalog endpoint must remain server-side and use explicit administrator capability checks.
 
-Do not fetch Statuspage data solely because the plugin activates. The first request may occur when an administrator opens the Statuspage setup/status surface or when a page actually renders the shortcode.
+Do not fetch Statuspage data solely because the plugin activates or because an editor loads the Statuspage block placeholder. The first request may occur when an administrator opens the Statuspage setup/status surface, explicitly refreshes it, or when a public page actually renders the shortcode/block.
+
 ## Votech integration contract
 
 Votech is a client integration of the canonical ToolsAPI Votech service. WordPress must not implement a second voting engine or a parallel API contract.
@@ -183,6 +197,7 @@ Every development request should have a linked issue/ticket and a PR.
 ```bash
 find . -name "*.php" -print -exec php -l {} \;
 php tests/statuspage-contract-test.php
+php tests/statuspage-block-test.php
 ```
 
 When WordPress Coding Standards are available:

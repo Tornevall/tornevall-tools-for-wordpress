@@ -41,6 +41,9 @@ jobs:
       - name: Run Statuspage contract tests
         run: php tests/statuspage-contract-test.php
 
+      - name: Run Statuspage block tests
+        run: php tests/statuspage-block-test.php
+
   plugin-check:
     name: WordPress Plugin Check
     runs-on: ubuntu-latest

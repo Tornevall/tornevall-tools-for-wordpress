@@ -10,7 +10,7 @@ Version `0.3.0` contains:
 
 - **Guestbook** - central Tools-backed guestbook with explicit per-site guestbook selection, shortcode rendering, owner-scoped reads/writes, moderation and Cloudflare Turnstile support.
 - **Dynamic DNS** - keep a Tornevall Networks Dynamic DNS hostname synchronized from WordPress manually or through WP-Cron.
-- **Statuspage** - render a public Tools Status Platform page in WordPress with overall state, component state, active incidents and incident timelines.
+- **Statuspage** - render a public Tools Status Platform page in WordPress with overall state, component state, active incidents and incident timelines, through either a shortcode or native Gutenberg block.
 - **Tools account connection** - explicitly authorize this WordPress site from a logged-in Tools account and let Tools create dedicated site credentials for supported services.
 
 AI is not part of the current public runtime. DNSBL/FraudBL is not duplicated in this plugin; the standalone DNSBL plugin remains authoritative for DNSBL behavior.
@@ -23,13 +23,15 @@ Tools is authoritative for Status Platform data. WordPress reads the public vers
 GET https://tools.tornevall.net/api/status/v1/pages/{slug}
 ```
 
-Configure the public status-page slug under **Tornevall Tools -> Statuspage** and render it with:
+Configure the public status-page slug under **Tornevall Tools -> Statuspage** and add the native **Tornevall Statuspage** block from the Tornevall Tools block category. The block is dynamic/server-rendered: its JavaScript provides the editor experience and settings only, while frontend output uses the same PHP renderer, cache and outage semantics as the shortcode. Opening the editor does not trigger a Status Platform API request merely to preview the block.
+
+The shortcode remains available for compatibility:
 
 ```text
 [tornevall_statuspage]
 ```
 
-Include recent resolved incident history with:
+Include recent resolved incident history either with the block inspector toggle or with:
 
 ```text
 [tornevall_statuspage history="1"]
@@ -165,8 +167,10 @@ includes/class-ttfw-dynamic-dns-module.php                Dynamic DNS logic and 
 includes/class-ttfw-module-registry.php                   Integration overview metadata
 includes/class-ttfw-statuspage-settings.php               Selected public status page and cache settings
 includes/class-ttfw-statuspage-api.php                    Status Platform v1 public response client/normalizer
-includes/class-ttfw-statuspage.php                        Statuspage cache, health semantics and shortcode rendering
+includes/class-ttfw-statuspage.php                        Statuspage cache, health semantics, shared renderer, shortcode and block registration
 includes/class-ttfw-statuspage-admin.php                  Statuspage setup and diagnostics
+blocks/statuspage/block.json                              Statuspage Gutenberg block metadata
+blocks/statuspage/index.js                                Statuspage editor UI; no direct Status API calls
 includes/class-ttfw-guestbook-api.php                     Tools Guestbook server-side client
 includes/class-ttfw-guestbook-settings.php                Guestbook credentials / selected book / Turnstile settings
 includes/class-ttfw-guestbook-connection-admin.php        Guestbook catalog, selection and remote creation
@@ -174,12 +178,13 @@ includes/class-ttfw-guestbook-rest.php                    Local Guestbook REST p
 includes/class-ttfw-guestbook.php                         Guestbook shortcode/frontend integration
 includes/class-ttfw-guestbook-admin.php                   Owner-scoped Guestbook administration
 assets/guestbook.js                                       Local Guestbook frontend client
-tests/statuspage-contract-test.php                         Deterministic Statuspage contract regression checks
+tests/statuspage-contract-test.php                        Deterministic Statuspage contract regression checks
+tests/statuspage-block-test.php                           Deterministic Gutenberg metadata/renderer wiring checks
 ```
 
 ## Verification
 
-The GitHub workflow runs PHP syntax checks on PHP 7.4 and 8.4, focused Statuspage contract tests on both versions, and the official WordPress Plugin Check action.
+The GitHub workflow runs PHP syntax checks on PHP 7.4 and 8.4, focused Statuspage contract and Gutenberg block tests on both versions, and the official WordPress Plugin Check action.
 
 ## License
 

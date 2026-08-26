@@ -18,7 +18,7 @@ Version 0.3.0 includes:
 
 * Guestbook: select one guestbook owned by the configured Tools user, then display, submit and moderate it from WordPress.
 * Dynamic DNS: keep a Tornevall Networks Dynamic DNS hostname updated manually or through WP-Cron.
-* Statuspage: render a public Tools status page with overall service state, components, active incidents and incident updates.
+* Statuspage: render a public Tools status page with overall service state, components, active incidents and incident updates through a shortcode or native Gutenberg block.
 * Tools account connection: explicitly authorize this WordPress installation from a logged-in Tools account and let Tools create dedicated site credentials for supported services.
 
 Service credentials are kept server-side. Integrations only contact external services when their functionality is configured or explicitly used.
@@ -27,11 +27,13 @@ Service credentials are kept server-side. Integrations only contact external ser
 
 Open `Tornevall Tools -> Statuspage` and configure the public Tools status page slug. The plugin reads the documented public Status Platform API and stores a bounded live cache plus the last successful snapshot.
 
-Add the status page to a post or page with:
+For the block editor, insert the `Tornevall Statuspage` block from the Tornevall Tools category. The block JavaScript only provides editor controls and a placeholder; frontend rendering is dynamic/server-side and uses the same PHP renderer, cache and outage semantics as the shortcode. Opening the editor does not trigger a Status Platform request merely to preview the block.
+
+The shortcode remains available:
 
 `[tornevall_statuspage]`
 
-To include recent resolved incidents:
+To include recent resolved incidents, enable the block inspector option or use:
 
 `[tornevall_statuspage history="1"]`
 
@@ -96,7 +98,7 @@ Statuspage uses the public read-only endpoint:
 
 `GET https://tools.tornevall.net/api/status/v1/pages/{slug}`
 
-The request contains only the configured public status page slug and normal HTTP metadata. No bearer credential is required. The returned public status data may be cached locally so the WordPress page can show the last known result if the live service is temporarily unavailable.
+The request contains only the configured public status page slug and normal HTTP metadata. No bearer credential is required. The returned public status data may be cached locally so the WordPress page can show the last known result if the live service is temporarily unavailable. The Gutenberg editor script does not call this endpoint directly.
 
 For the optional Tools account connection, WordPress sends the site name, site URL, same-host callback URL and requested service names to:
 
@@ -163,12 +165,16 @@ https://www.cloudflare.com/turnstile-privacy-policy/
 1. Upload the plugin directory to `/wp-content/plugins/tornevall-tools-for-wordpress` or install it through WordPress when available in the Plugin Directory.
 2. Activate `Tornevall Tools for WordPress`.
 3. Open `Tornevall Tools` in wp-admin. Optionally connect a logged-in Tools account to let Tools create managed DNSBL/Guestbook credentials for this site.
-4. For Statuspage, open `Tornevall Tools -> Statuspage`, enter the public Tools status page slug and add `[tornevall_statuspage]` to a page.
+4. For Statuspage, open `Tornevall Tools -> Statuspage`, enter the public Tools status page slug and insert the `Tornevall Statuspage` block, or use `[tornevall_statuspage]` for shortcode compatibility.
 5. For Guestbook, open `Tornevall Tools -> Guestbook connection` and select an existing guestbook or create a new one. A manual Guestbook token can still be configured and overrides a managed one.
 6. Configure this WordPress site's own Cloudflare Turnstile site key and secret if public Guestbook signing should be enabled.
 7. Configure Dynamic DNS manually if required.
 
 == Frequently Asked Questions ==
+
+= Does Statuspage support the block editor? =
+
+Yes. Insert the native `Tornevall Statuspage` block. It is a dynamic block: JavaScript handles editor controls, while public output is rendered by the same PHP path used by the shortcode.
 
 = What happens if the Statuspage API is unreachable? =
 
@@ -221,10 +227,10 @@ No. Dynamic DNS is disabled by default.
 == Changelog ==
 
 = 0.3.0 =
-* Added Statuspage configuration and public rendering through `[tornevall_statuspage]`.
+* Added Statuspage configuration and public rendering through the native Gutenberg block and `[tornevall_statuspage]`.
 * Added Tools Status Platform v1 public response validation, component status and incident timelines.
 * Added bounded live caching and last-successful fallback. Communication failures are stale/unavailable, not major outages.
-* Added focused Statuspage contract tests to the PHP compatibility CI matrix.
+* Added focused Statuspage contract and Gutenberg block tests to the PHP compatibility CI matrix.
 
 = 0.2.2 =
 * Added explicit Tools account pairing from wp-admin with login and approval on tools.tornevall.net.
