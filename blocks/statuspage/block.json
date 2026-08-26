@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "tornevall-tools/statuspage",
+  "version": "0.3.0",
+  "title": "Tornevall Statuspage",
+  "category": "tornevall-tools",
+  "icon": "shield",
+  "description": "Display the configured Tornevall Tools Statuspage.",
+  "textdomain": "tornevall-tools-for-wordpress",
+  "attributes": {
+    "history": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "className": true,
+    "align": ["wide", "full"]
+  }
+}
