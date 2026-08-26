@@ -27,6 +27,8 @@ class TTFW_Plugin {
 		TTFW_Guestbook::init();
 		TTFW_Guestbook_Admin::init();
 		TTFW_Guestbook_Connection_Admin::init();
+		TTFW_Statuspage::init();
+		TTFW_Statuspage_Admin::init();
 
 		add_action( 'plugins_loaded', array( __CLASS__, 'load_textdomain' ) );
 		add_action( 'rest_api_init', array( 'TTFW_Guestbook_REST', 'register_routes' ) );
@@ -40,6 +42,9 @@ class TTFW_Plugin {
 	public static function activate() {
 		if ( false === get_option( TTFW_Settings::OPTION_NAME, false ) ) {
 			add_option( TTFW_Settings::OPTION_NAME, TTFW_Settings::defaults(), '', false );
+		}
+		if ( false === get_option( TTFW_Statuspage_Settings::OPTION_NAME, false ) ) {
+			add_option( TTFW_Statuspage_Settings::OPTION_NAME, TTFW_Statuspage_Settings::defaults(), '', false );
 		}
 
 		TTFW_Dynamic_DNS_Module::activate();
