@@ -38,6 +38,9 @@ jobs:
       - name: Lint PHP files
         run: find . -name '*.php' -not -path './vendor/*' -print -exec php -l {} \;
 
+      - name: Run Statuspage contract tests
+        run: php tests/statuspage-contract-test.php
+
   plugin-check:
     name: WordPress Plugin Check
     runs-on: ubuntu-latest
