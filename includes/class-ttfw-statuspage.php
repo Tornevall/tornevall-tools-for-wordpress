@@ -10,16 +10,58 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Provides the public Statuspage shortcode and snapshot health semantics.
+ * Provides the public Statuspage shortcode, Gutenberg block and snapshot health semantics.
  */
 class TTFW_Statuspage {
 	const CACHE_TRANSIENT_PREFIX = 'ttfw_statuspage_live_';
 	const LAST_GOOD_OPTION       = 'ttfw_statuspage_last_good';
 	const SHORTCODE              = 'tornevall_statuspage';
+	const BLOCK_NAME             = 'tornevall-tools/statuspage';
+	const BLOCK_CATEGORY         = 'tornevall-tools';
+	const BLOCK_SCRIPT_HANDLE    = 'ttfw-statuspage-block-editor';
 
 	/** @return void */
 	public static function init() {
 		add_shortcode( self::SHORTCODE, array( __CLASS__, 'render_shortcode' ) );
+		add_action( 'init', array( __CLASS__, 'register_block' ) );
+		add_filter( 'block_categories_all', array( __CLASS__, 'register_block_category' ), 10, 2 );
+	}
+
+	/** @return void */
+	public static function register_block() {
+		$script_path = TTFW_PATH . 'blocks/statuspage/index.js';
+		wp_register_script(
+			self::BLOCK_SCRIPT_HANDLE,
+			TTFW_URL . 'blocks/statuspage/index.js',
+			array( 'wp-blocks', 'wp-block-editor', 'wp-components', 'wp-element', 'wp-i18n' ),
+			file_exists( $script_path ) ? (string) filemtime( $script_path ) : TTFW_VERSION,
+			true
+		);
+
+		register_block_type(
+			TTFW_PATH . 'blocks/statuspage',
+			array(
+				'editor_script'   => self::BLOCK_SCRIPT_HANDLE,
+				'render_callback' => array( __CLASS__, 'render_block' ),
+			)
+		);
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $categories Existing categories.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function register_block_category( $categories ) {
+		foreach ( $categories as $category ) {
+			if ( self::BLOCK_CATEGORY === ( $category['slug'] ?? '' ) ) {
+				return $categories;
+			}
+		}
+		$categories[] = array(
+			'slug'  => self::BLOCK_CATEGORY,
+			'title' => __( 'Tornevall Tools', 'tornevall-tools-for-wordpress' ),
+		);
+		return $categories;
 	}
 
 	/**
@@ -133,6 +175,36 @@ class TTFW_Statuspage {
 			$atts,
 			self::SHORTCODE
 		);
+
+		return self::render(
+			array(
+				'history' => '1' === (string) $atts['history'],
+			)
+		);
+	}
+
+	/**
+	 * @param array<string,mixed> $attributes Block attributes.
+	 * @return string
+	 */
+	public static function render_block( $attributes = array() ) {
+		$content = self::render(
+			array(
+				'history' => ! empty( $attributes['history'] ),
+			)
+		);
+		$wrapper = get_block_wrapper_attributes( array( 'class' => 'ttfw-statuspage-block' ) );
+		return '<div ' . $wrapper . '>' . $content . '</div>';
+	}
+
+	/**
+	 * Canonical Statuspage renderer shared by shortcode and Gutenberg block.
+	 *
+	 * @param array<string,mixed> $attributes Render attributes.
+	 * @return string
+	 */
+	public static function render( $attributes = array() ) {
+		$show_history = ! empty( $attributes['history'] );
 		$snapshot = self::snapshot();
 		$health = sanitize_key( (string) ( $snapshot['health'] ?? 'unavailable' ) );
 
@@ -183,7 +255,7 @@ class TTFW_Statuspage {
 			echo '</div>';
 		}
 
-		if ( '1' === (string) $atts['history'] && ! empty( $payload['incident_history'] ) && is_array( $payload['incident_history'] ) ) {
+		if ( $show_history && ! empty( $payload['incident_history'] ) && is_array( $payload['incident_history'] ) ) {
 			echo '<div class="ttfw-statuspage__history"><h3>' . esc_html__( 'Recent incidents', 'tornevall-tools-for-wordpress' ) . '</h3>';
 			foreach ( $payload['incident_history'] as $incident ) {
 				self::render_incident( $incident );
