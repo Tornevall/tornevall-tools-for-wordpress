@@ -1,26 +1,45 @@
 === Tornevall Tools for WordPress ===
 Contributors: tornevall
-Tags: tools, guestbook, dynamic-dns, dns, automation
+Tags: tools, guestbook, dynamic-dns, statuspage, monitoring, automation
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.2
+Stable tag: 0.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connect WordPress to selected Tornevall Networks Tools services, including Guestbook, Dynamic DNS and optional account-managed credentials.
+Connect WordPress to selected Tornevall Networks Tools services, including Guestbook, Dynamic DNS, Statuspage and optional account-managed credentials.
 
 == Description ==
 
 Tornevall Tools for WordPress is the WordPress integration for selected services provided by Tornevall Networks Tools.
 
-Version 0.2.2 includes:
+Version 0.3.0 includes:
 
 * Guestbook: select one guestbook owned by the configured Tools user, then display, submit and moderate it from WordPress.
 * Dynamic DNS: keep a Tornevall Networks Dynamic DNS hostname updated manually or through WP-Cron.
+* Statuspage: render a public Tools status page with overall service state, components, active incidents and incident updates.
 * Tools account connection: explicitly authorize this WordPress installation from a logged-in Tools account and let Tools create dedicated site credentials for supported services.
 
 Service credentials are kept server-side. Integrations only contact external services when their functionality is configured or explicitly used.
+
+= Statuspage =
+
+Open `Tornevall Tools -> Statuspage` and configure the public Tools status page slug. The plugin reads the documented public Status Platform API and stores a bounded live cache plus the last successful snapshot.
+
+Add the status page to a post or page with:
+
+`[tornevall_statuspage]`
+
+To include recent resolved incidents:
+
+`[tornevall_statuspage history="1"]`
+
+The WordPress rendering includes the overall status, components, active incidents and incident update timelines. Tools remains authoritative for all status data.
+
+Status semantics deliberately distinguish a confirmed outage from a communication problem. A confirmed `major_outage` may be rendered as critical/red by a theme. Missing configuration is neutral. Unknown status remains unknown. If the Tools API cannot be reached, WordPress uses the last successful snapshot when available and marks it stale instead of reporting an outage. If no successful snapshot exists, the integration reports the status as temporarily unavailable, not as a major outage.
+
+The public status API does not require a bearer token. No Tools credential is inserted into public HTML or browser JavaScript.
 
 = Tools account connection =
 
@@ -72,6 +91,12 @@ Dynamic DNS is disabled by default and does not send authenticated requests unti
 = External services =
 
 This plugin integrates with Tornevall Networks Tools at `https://tools.tornevall.net`.
+
+Statuspage uses the public read-only endpoint:
+
+`GET https://tools.tornevall.net/api/status/v1/pages/{slug}`
+
+The request contains only the configured public status page slug and normal HTTP metadata. No bearer credential is required. The returned public status data may be cached locally so the WordPress page can show the last known result if the live service is temporarily unavailable.
 
 For the optional Tools account connection, WordPress sends the site name, site URL, same-host callback URL and requested service names to:
 
@@ -138,11 +163,20 @@ https://www.cloudflare.com/turnstile-privacy-policy/
 1. Upload the plugin directory to `/wp-content/plugins/tornevall-tools-for-wordpress` or install it through WordPress when available in the Plugin Directory.
 2. Activate `Tornevall Tools for WordPress`.
 3. Open `Tornevall Tools` in wp-admin. Optionally connect a logged-in Tools account to let Tools create managed DNSBL/Guestbook credentials for this site.
-4. For Guestbook, open `Tornevall Tools -> Guestbook connection` and select an existing guestbook or create a new one. A manual Guestbook token can still be configured and overrides a managed one.
-5. Configure this WordPress site's own Cloudflare Turnstile site key and secret if public Guestbook signing should be enabled.
-6. Configure Dynamic DNS manually if required.
+4. For Statuspage, open `Tornevall Tools -> Statuspage`, enter the public Tools status page slug and add `[tornevall_statuspage]` to a page.
+5. For Guestbook, open `Tornevall Tools -> Guestbook connection` and select an existing guestbook or create a new one. A manual Guestbook token can still be configured and overrides a managed one.
+6. Configure this WordPress site's own Cloudflare Turnstile site key and secret if public Guestbook signing should be enabled.
+7. Configure Dynamic DNS manually if required.
 
 == Frequently Asked Questions ==
+
+= What happens if the Statuspage API is unreachable? =
+
+A network/API failure is not treated as a confirmed outage. WordPress shows the last successful status as stale when available. Without a previous successful response it shows a temporary unavailable/unknown state. Only an explicit `major_outage` from Tools is treated as a major outage.
+
+= Does Statuspage expose a Tools token in the browser? =
+
+No. The Statuspage endpoint is public and read-only, and the plugin does not insert Tools credentials into Statuspage markup or browser JavaScript.
 
 = What is Tornevall Tools for WordPress? =
 
@@ -185,6 +219,12 @@ No. Guestbook, Dynamic DNS and managed service credentials are kept server-side 
 No. Dynamic DNS is disabled by default.
 
 == Changelog ==
+
+= 0.3.0 =
+* Added Statuspage configuration and public rendering through `[tornevall_statuspage]`.
+* Added Tools Status Platform v1 public response validation, component status and incident timelines.
+* Added bounded live caching and last-successful fallback. Communication failures are stale/unavailable, not major outages.
+* Added focused Statuspage contract tests to the PHP compatibility CI matrix.
 
 = 0.2.2 =
 * Added explicit Tools account pairing from wp-admin with login and approval on tools.tornevall.net.
