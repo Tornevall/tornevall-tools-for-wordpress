@@ -65,6 +65,16 @@ The configured status slug must remain a constrained identifier and must never b
 Public Statuspage rendering must not expose Tools bearer credentials. The current public endpoint needs no bearer token. Any future owner-scoped configuration/catalog endpoint must remain server-side and use explicit administrator capability checks.
 
 Do not fetch Statuspage data solely because the plugin activates. The first request may occur when an administrator opens the Statuspage setup/status surface or when a page actually renders the shortcode.
+## Votech integration contract
+
+Votech is a client integration of the canonical ToolsAPI Votech service. WordPress must not implement a second voting engine or a parallel API contract.
+
+- Use the canonical ToolsAPI Votech API namespace directly under `/api/votech/...`.
+- Do not introduce URL-based Votech API versions such as `/api/votech/v1`, `/api/votech/v2`, `/v1`, `/v2`, versioned SDK directories, or equivalent route namespaces.
+- Do not add a versioned WordPress-side proxy path merely to wrap the unversioned ToolsAPI Votech API.
+- This is an explicit architecture rule required to match the current ToolsAPI API structure. It overrides any generic preference to version new APIs in the URL.
+- Consume the same canonical Votech SDK/embed contract used by ToolsAPI issue Tornevall/toolsApi#1001 and the WordPress integration tickets #22/#23.
+- If a future concrete compatibility problem requires a migration mechanism, handle that specific case explicitly instead of pre-creating version namespaces.
 
 ## Tools account pairing
 
