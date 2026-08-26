@@ -6,6 +6,11 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Added
 
+- Added a first-class Statuspage integration backed by the Tornevall Tools public Status Platform API (`/api/status/v1/pages/{slug}`).
+- Added a dedicated **Tornevall Tools -> Statuspage** setup and diagnostics page.
+- Added `[tornevall_statuspage]` rendering for overall state, components, active incidents and incident timelines, with optional resolved incident history through `history="1"`.
+- Added a bounded live cache and a persistent last-successful snapshot so temporary Tools/API failures can fall back to stale data.
+- Added focused deterministic Statuspage contract tests to the existing PHP 7.4/8.4 CI matrix.
 - Added an explicit Tools account pairing flow from wp-admin. The administrator is sent to `tools.tornevall.net`, signs in there and approves the WordPress installation before any managed credential is issued.
 - Added DNSBL/FraudBL account pairing that can select an existing active non-admin token, rotate it in place and return its new secret directly to this WordPress installation through the one-time server-side exchange.
 - Added an explicit alternative on the Tools approval page for creating a separate non-admin DNSBL site token instead of rotating the selected token.
@@ -15,6 +20,8 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Changed
 
+- Statuspage health semantics now reserve `major_outage`/critical presentation for a confirmed remote outage. Missing configuration is neutral, unknown state remains unknown, and communication failures use stale/unavailable state instead of being promoted to an outage.
+- Bumped the development version to 0.3.0 for the Statuspage integration.
 - The pairing client now accepts the generic `tools_connection` callback state while retaining compatibility with the original `ttfw_connection` field.
 - Guestbook uses a managed Tools credential automatically when no manual Guestbook token is configured. A manual token remains the explicit override.
 - The shared Tools API client now has a separate unauthenticated request method used only for the public pairing endpoints; authenticated service requests still require a token.
@@ -24,6 +31,8 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Security and privacy
 
+- Statuspage reads use only the public read contract; no Tools bearer credential is exposed to browser JavaScript or public markup.
+- Statuspage response data is normalized and escaped before rendering, and the configured identifier is restricted to the documented slug format.
 - Existing DNSBL token secrets are never displayed or returned before rotation. When rotation is approved, Tools generates a new secret, invalidates the previous one and returns only the new value once.
 - Admin DNSBL tokens are never installed directly in WordPress. Selecting one causes Tools to create a non-admin copy of its effective DNSBL permissions instead.
 - Pairing state is kept in a short-lived per-admin transient and credential exchange happens server-to-server.
