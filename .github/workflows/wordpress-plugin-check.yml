@@ -38,6 +38,9 @@ jobs:
       - name: Lint PHP files
         run: find . -name '*.php' -not -path './vendor/*' -print -exec php -l {} \;
 
+      - name: Run Statuspage contract tests
+        run: php tests/statuspage-contract-test.php
+
   plugin-check:
     name: WordPress Plugin Check
     runs-on: ubuntu-latest
@@ -51,7 +54,10 @@ jobs:
         with:
           build-dir: './'
           strict: false
+          # Tests are development-only and are validated separately above; they
+          # are not part of the production plugin payload reviewed by Plugin Check.
+          exclude-directories: tests
           # Cloudflare Turnstile is an explicitly documented external service.
           # Ignore only Plugin Check's generic offloaded-content code; all other
-          # current and future errors remain blocking.
+          # current and future production-code errors remain blocking.
           ignore-codes: PluginCheck.CodeAnalysis.Offloading.OffloadedContent

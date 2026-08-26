@@ -45,6 +45,12 @@ class TTFW_Module_Registry {
 				'enabled'     => ! empty( $options['dyndns_enabled'] ),
 				'status'      => TTFW_Dynamic_DNS_Module::configuration_status(),
 			),
+			'statuspage' => array(
+				'name'        => __( 'Statuspage', 'tornevall-tools-for-wordpress' ),
+				'description' => __( 'Render a Tornevall Tools public status page with component and incident state.', 'tornevall-tools-for-wordpress' ),
+				'enabled'     => '' !== TTFW_Statuspage_Settings::slug(),
+				'status'      => TTFW_Statuspage::configuration_status(),
+			),
 		);
 	}
 }
