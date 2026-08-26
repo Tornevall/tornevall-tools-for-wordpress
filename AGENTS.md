@@ -10,7 +10,8 @@ Current public integrations:
 
 1. Guestbook.
 2. Dynamic DNS.
-3. Optional Tools account pairing for managed service credentials.
+3. Statuspage.
+4. Optional Tools account pairing for managed service credentials.
 
 AI work remains separate until it is production-ready. DNSBL/FraudBL must not be reimplemented here because Tornevall Networks DNSBL has its own WordPress plugin. The Guestbook may use the standalone DNSBL plugin through its public WordPress bridge when that plugin is installed and active. Tools account pairing may supply a site-specific DNSBL credential to that plugin, but this repository must still not implement DNSBL lookup/write behavior itself.
 
@@ -18,12 +19,15 @@ AI work remains separate until it is production-ready. DNSBL/FraudBL must not be
 
 - `tornevall-tools-for-wordpress.php` loads the plugin runtime.
 - `TTFW_Settings` owns the Tornevall Tools overview and Dynamic DNS settings.
-- `TTFW_API_Client` is the fixed-origin server-side client for documented `tools.tornevall.net/api/*` endpoints. Authenticated `request()` still requires a token. Public pairing calls use the separate `public_request()` method.
+- `TTFW_API_Client` is the fixed-origin server-side client for documented `tools.tornevall.net/api/*` endpoints. Authenticated `request()` still requires a token. Public pairing and Statuspage calls use the separate `public_request()` method.
 - `TTFW_Tools_Connection` owns the explicit Tools account device flow, one-time exchange and locally stored managed service credentials.
 - `TTFW_Tools_Connection_Admin` renders the connect/disconnect controls and public-safe service status on the Tools overview page.
 - `TTFW_Dynamic_DNS_Module` owns Dynamic DNS updates and WP-Cron scheduling.
 - `TTFW_Guestbook_API`, `TTFW_Guestbook_REST`, `TTFW_Guestbook_Settings`, `TTFW_Guestbook`, `TTFW_Guestbook_Admin` and `TTFW_Guestbook_Connection_Admin` own the central Tools Guestbook integration.
-- `TTFW_Guestbook_Connection_Admin` is the explicit admin surface for listing the configured Tools user's guestbooks, selecting one for this WordPress installation and creating a new owned book when the token permits it.
+- `TTFW_Statuspage_Settings` owns the configured public status-page slug and bounded live-cache TTL.
+- `TTFW_Statuspage_API` consumes and validates the versioned public Status Platform contract at `/api/status/v1/pages/{slug}`.
+- `TTFW_Statuspage` owns last-good caching, health semantics and `[tornevall_statuspage]` rendering.
+- `TTFW_Statuspage_Admin` renders the Statuspage setup and diagnostics surface.
 - `TTFW_Module_Registry` exposes integration status for the Tools overview.
 - Guestbook frontend JavaScript is packaged locally as `assets/guestbook.js`.
 
@@ -34,6 +38,33 @@ Each integration should solve one independently useful WordPress problem and onl
 Remote service use must be documented in `readme.txt`. Credentials stay server-side. State-changing admin actions require capability checks and nonces. Public REST routes need explicit permission behavior and strict validation.
 
 Do not make authenticated external requests merely because the plugin was activated.
+
+## Statuspage
+
+Tools remains authoritative for status pages, components, incidents and incident updates. WordPress is a public read/render layer and must not introduce a second Status Platform database or local incident editor.
+
+The public v1 read contract is:
+
+```text
+GET https://tools.tornevall.net/api/status/v1/pages/{slug}
+```
+
+The client must require schema version `1.0` and normalize all externally supplied status, page, component and incident fields before rendering.
+
+Status health semantics are part of the contract:
+
+- `major_outage` is the only confirmed critical/major-outage state.
+- `degraded`, `partial_outage`, `maintenance`, and `stale` are warning/non-critical states.
+- missing configuration is neutral.
+- unknown/unrecognized remote state stays `unknown`; never promote it to outage.
+- an HTTP/API/JSON/transport failure is a communication failure, not evidence of a service outage.
+- on communication failure, use the last successful snapshot as `stale` when available; otherwise report unavailable/unknown.
+
+The configured status slug must remain a constrained identifier and must never become an arbitrary remote URL. The Tools origin stays fixed in `TTFW_API_Client`.
+
+Public Statuspage rendering must not expose Tools bearer credentials. The current public endpoint needs no bearer token. Any future owner-scoped configuration/catalog endpoint must remain server-side and use explicit administrator capability checks.
+
+Do not fetch Statuspage data solely because the plugin activates. The first request may occur when an administrator opens the Statuspage setup/status surface or when a page actually renders the shortcode.
 
 ## Tools account pairing
 
@@ -141,6 +172,7 @@ Every development request should have a linked issue/ticket and a PR.
 
 ```bash
 find . -name "*.php" -print -exec php -l {} \;
+php tests/statuspage-contract-test.php
 ```
 
 When WordPress Coding Standards are available:
