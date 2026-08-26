@@ -30,15 +30,15 @@ class TTFW_Statuspage {
 		$slug = TTFW_Statuspage_Settings::slug();
 		if ( '' === $slug ) {
 			return array(
-				'health'    => 'not_configured',
-				'is_stale'  => false,
-				'payload'   => array(),
-				'error'     => '',
-				'fetched_at'=> '',
+				'health'     => 'not_configured',
+				'is_stale'   => false,
+				'payload'    => array(),
+				'error'      => '',
+				'fetched_at' => '',
 			);
 		}
 
-		$cache_key = self::CACHE_TRANSIENT_PREFIX . md5( $slug );
+		$cache_key = self::cache_key( $slug );
 		if ( ! $force ) {
 			$cached = get_transient( $cache_key );
 			if ( is_array( $cached ) && ! empty( $cached['payload'] ) ) {
@@ -60,13 +60,12 @@ class TTFW_Statuspage {
 			return $snapshot;
 		}
 
-		$last_good = get_option( self::LAST_GOOD_OPTION, array() );
-		if ( is_array( $last_good ) && $slug === (string) ( $last_good['slug'] ?? '' ) && is_array( $last_good['snapshot'] ?? null ) && ! empty( $last_good['snapshot']['payload'] ) ) {
-			$snapshot = $last_good['snapshot'];
-			$snapshot['health'] = 'stale';
-			$snapshot['is_stale'] = true;
-			$snapshot['error'] = sanitize_text_field( $result->get_error_message() );
-			return $snapshot;
+		$last_good = self::last_good_snapshot( $slug );
+		if ( ! empty( $last_good['payload'] ) ) {
+			$last_good['health'] = 'stale';
+			$last_good['is_stale'] = true;
+			$last_good['error'] = sanitize_text_field( $result->get_error_message() );
+			return $last_good;
 		}
 
 		return array(
@@ -83,21 +82,29 @@ class TTFW_Statuspage {
 	 * @return string
 	 */
 	public static function health_from_remote_status( $status ) {
-		$status = TTFW_Statuspage_API::normalize_status( $status );
-		return $status;
+		return TTFW_Statuspage_API::normalize_status( $status );
 	}
 
 	/**
-	 * Overview status. Communication failures are never reported as major outage.
+	 * Returns overview status without causing a remote request.
 	 *
 	 * @return string
 	 */
 	public static function configuration_status() {
-		if ( '' === TTFW_Statuspage_Settings::slug() ) {
+		$slug = TTFW_Statuspage_Settings::slug();
+		if ( '' === $slug ) {
 			return __( 'Not configured', 'tornevall-tools-for-wordpress' );
 		}
-		$snapshot = self::snapshot();
-		switch ( $snapshot['health'] ?? 'unavailable' ) {
+
+		$snapshot = get_transient( self::cache_key( $slug ) );
+		if ( ! is_array( $snapshot ) || empty( $snapshot['payload'] ) ) {
+			$snapshot = self::last_good_snapshot( $slug );
+			if ( empty( $snapshot['payload'] ) ) {
+				return __( 'Configured; status not checked', 'tornevall-tools-for-wordpress' );
+			}
+		}
+
+		switch ( $snapshot['health'] ?? 'unknown' ) {
 			case 'operational':
 				return __( 'Operational', 'tornevall-tools-for-wordpress' );
 			case 'degraded':
@@ -108,12 +115,9 @@ class TTFW_Statuspage {
 				return __( 'Major outage', 'tornevall-tools-for-wordpress' );
 			case 'maintenance':
 				return __( 'Maintenance', 'tornevall-tools-for-wordpress' );
-			case 'stale':
-				return __( 'Last known status (stale)', 'tornevall-tools-for-wordpress' );
 			case 'unknown':
-				return __( 'Status not yet verified', 'tornevall-tools-for-wordpress' );
 			default:
-				return __( 'Temporarily unavailable', 'tornevall-tools-for-wordpress' );
+				return __( 'Status not yet verified', 'tornevall-tools-for-wordpress' );
 		}
 	}
 
@@ -222,6 +226,26 @@ class TTFW_Statuspage {
 			echo '</ol>';
 		}
 		echo '</article>';
+	}
+
+	/**
+	 * @param string $slug Statuspage slug.
+	 * @return string
+	 */
+	private static function cache_key( $slug ) {
+		return self::CACHE_TRANSIENT_PREFIX . md5( (string) $slug );
+	}
+
+	/**
+	 * @param string $slug Statuspage slug.
+	 * @return array<string,mixed>
+	 */
+	private static function last_good_snapshot( $slug ) {
+		$last_good = get_option( self::LAST_GOOD_OPTION, array() );
+		if ( ! is_array( $last_good ) || $slug !== (string) ( $last_good['slug'] ?? '' ) || ! is_array( $last_good['snapshot'] ?? null ) ) {
+			return array();
+		}
+		return $last_good['snapshot'];
 	}
 
 	/**
