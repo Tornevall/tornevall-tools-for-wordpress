@@ -74,7 +74,11 @@ The Guestbook uses local WordPress JavaScript and local WordPress REST endpoints
 
 After configuring a manual Guestbook token or connecting a Tools account that grants Guestbook access, open `Tornevall Tools -> Guestbook connection`. The page loads guestbooks owned by the Tools user behind that token and lets an administrator select the one used by this WordPress site. The selected guestbook id/slug is stored locally and added server-side to guestbook read, write and moderation-list requests.
 
+Existing owned guestbooks can be edited from the same page instead of creating a duplicate. Choose `Edit` next to a guestbook to change its name, slug, theme, site URL, language, description and active/hosted state. Editing requires both `guestbook.write` and `guestbook.moderate`. If the edited book is currently selected, WordPress refreshes its locally stored slug after Tools confirms the change.
+
 If the effective token has both `guestbook.write` and `guestbook.moderate`, WordPress can also create a new guestbook in Tools and select it immediately. The create form can send the WordPress site URL, locale and a short site description as initial guestbook context. Tools always owns the authoritative guestbook record, and the Tools user behind the token is always the owner.
+
+Guestbook token/Turnstile settings and entry moderation are grouped under `Tornevall Tools -> Tools Guestbook`. The page no longer appears as a separate item under WordPress core `Tools`.
 
 Replacing the manually configured Guestbook token clears the previous guestbook selection.
 
@@ -114,7 +118,7 @@ For Guestbook functionality, WordPress communicates server-to-server with the To
 
 `https://tools.tornevall.net/api/guestbook`
 
-WordPress may send the effective Guestbook bearer token and Guestbook read/write/moderation data to that service. When an administrator explicitly opens or uses the Guestbook connection page, WordPress may also request the token user's guestbook catalog and may send a new guestbook name, slug, site URL, locale and site description when creating a guestbook. The token is stored server-side and is not sent to public browser JavaScript.
+WordPress may send the effective Guestbook bearer token and Guestbook read/write/moderation data to that service. When an administrator explicitly opens or uses the Guestbook connection page, WordPress may request the token user's guestbook catalog, create a guestbook, or update an existing owned guestbook. Create/update data can include the guestbook name, slug, theme, site URL, locale/language, description and active/hosted state. The token is stored server-side and is not sent to public browser JavaScript.
 
 For Dynamic DNS, WordPress sends the configured Dynamic DNS hostname, bearer token, and `address=auto` to:
 
@@ -166,7 +170,7 @@ https://www.cloudflare.com/turnstile-privacy-policy/
 2. Activate `Tornevall Tools for WordPress`.
 3. Open `Tornevall Tools` in wp-admin. Optionally connect a logged-in Tools account to let Tools create managed DNSBL/Guestbook credentials for this site.
 4. For Statuspage, open `Tornevall Tools -> Statuspage`, enter the public Tools status page slug and insert the `Tornevall Statuspage` block, or use `[tornevall_statuspage]` for shortcode compatibility.
-5. For Guestbook, open `Tornevall Tools -> Guestbook connection` and select an existing guestbook or create a new one. A manual Guestbook token can still be configured and overrides a managed one.
+5. For Guestbook, open `Tornevall Tools -> Guestbook connection` and select an existing guestbook, edit an existing guestbook, or create a new one. A manual Guestbook token can still be configured and overrides a managed one.
 6. Configure this WordPress site's own Cloudflare Turnstile site key and secret if public Guestbook signing should be enabled.
 7. Configure Dynamic DNS manually if required.
 
@@ -200,6 +204,10 @@ The manual token remains the explicit override. A managed Guestbook token is use
 
 One Tools user can own multiple guestbooks. The explicit selection makes this WordPress installation consistently use one of them for public reads, submissions and moderation listings.
 
+= Can I change the slug of an existing Tools guestbook from WordPress? =
+
+Yes. Open `Tornevall Tools -> Guestbook connection` and choose `Edit` for the owned guestbook. The change updates the existing Tools record instead of creating a new guestbook. The effective token must have both Guestbook scopes.
+
 = Can WordPress create the Tools guestbook for me? =
 
 Yes, when the effective server-side token has both `guestbook.write` and `guestbook.moderate`. Otherwise you can still select an existing guestbook owned by that Tools user.
@@ -225,6 +233,10 @@ No. Guestbook, Dynamic DNS and managed service credentials are kept server-side 
 No. Dynamic DNS is disabled by default.
 
 == Changelog ==
+
+= Unreleased =
+* Existing owned guestbooks can now be edited from Guestbook connection, including slug and site metadata, instead of requiring a duplicate book.
+* Tools Guestbook settings/moderation now appears under the Tornevall Tools menu instead of WordPress core Tools.
 
 = 0.3.0 =
 * Added Statuspage configuration and public rendering through the native Gutenberg block and `[tornevall_statuspage]`.
