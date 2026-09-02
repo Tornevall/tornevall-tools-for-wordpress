@@ -48,6 +48,28 @@ class TTFW_Guestbook_API {
 	}
 
 	/**
+	 * @param int                 $guestbook_id Guestbook id.
+	 * @param array<string,mixed> $payload Guestbook update payload.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	public function update_owned_book( $guestbook_id, $payload ) {
+		$guestbook_id = absint( $guestbook_id );
+		if ( $guestbook_id < 1 ) {
+			return new WP_Error(
+				'ttfw_guestbook_invalid_book',
+				__( 'A valid Tools guestbook id is required.', 'tornevall-tools-for-wordpress' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return $this->request(
+			'PATCH',
+			'/owned/books/' . $guestbook_id,
+			is_array( $payload ) ? $payload : array()
+		);
+	}
+
+	/**
 	 * @param array<string,mixed> $query Public listing query.
 	 * @return array<string,mixed>|WP_Error
 	 */
