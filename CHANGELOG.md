@@ -6,6 +6,8 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Added
 
+- Added editing for existing Tools guestbooks directly from **Tornevall Tools -> Guestbook connection**, including name, slug, theme, site URL, language, description and active/hosted state. The selected local guestbook slug is refreshed after a successful update. Tracked in #30.
+- Added a deterministic Guestbook connection contract test covering the update action, unversioned PATCH client path, selected-slug refresh and admin menu placement.
 - Added a native dynamic Gutenberg block for Statuspage under a Tornevall Tools block category, with an editor control for recent resolved incident history.
 - Added a first-class Statuspage integration backed by the Tornevall Tools public Status Platform API (`/api/status/v1/pages/{slug}`).
 - Added a dedicated **Tornevall Tools -> Statuspage** setup and diagnostics page.
@@ -21,6 +23,7 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Changed
 
+- Moved the existing **Tools Guestbook** settings/moderation page out of WordPress core **Tools** and into the plugin's **Tornevall Tools** menu, next to **Guestbook connection**. Tracked in #30.
 - Statuspage shortcode and Gutenberg block now share one canonical PHP renderer so cache, incident history and outage semantics cannot drift between editor surfaces.
 - The Statuspage block editor is presentation-only and does not make Status Platform API requests merely because an editor opens a post.
 - Statuspage health semantics now reserve `major_outage`/critical presentation for a confirmed remote outage. Missing configuration is neutral, unknown state remains unknown, and communication failures use stale/unavailable state instead of being promoted to an outage.
@@ -34,6 +37,7 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Security and privacy
 
+- Existing guestbook updates remain server-side and owner-scoped by Tools; WordPress never sends an owner id, and editing requires both `guestbook.write` and `guestbook.moderate`.
 - Statuspage reads use only the public read contract; no Tools bearer credential is exposed to browser JavaScript or public markup.
 - Statuspage response data is normalized and escaped before rendering, and the configured identifier is restricted to the documented slug format.
 - Existing DNSBL token secrets are never displayed or returned before rotation. When rotation is approved, Tools generates a new secret, invalidates the previous one and returns only the new value once.
