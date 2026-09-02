@@ -88,6 +88,10 @@ https://tools.tornevall.net/api/guestbook
 
 A Tools account may own more than one guestbook. After configuring a server-side Guestbook token, or connecting a Tools account that grants Guestbook access, open **Tornevall Tools -> Guestbook connection** and select the guestbook used by this WordPress installation.
 
+Existing guestbooks can be edited from the same connection page instead of creating a duplicate. Choose **Edit** on an owned book to change its name, slug, theme, site URL, language, description and active/hosted state. Editing requires both `guestbook.write` and `guestbook.moderate`. If the edited book is the one currently selected for the site, WordPress refreshes its stored slug after Tools confirms the update.
+
+The Guestbook token/Turnstile settings and entry moderation page is available under **Tornevall Tools -> Tools Guestbook**. It is intentionally grouped with the rest of the plugin instead of appearing as a separate item under WordPress core **Tools**.
+
 Basic shortcode:
 
 ```text
@@ -173,18 +177,19 @@ blocks/statuspage/block.json                              Statuspage Gutenberg b
 blocks/statuspage/index.js                                Statuspage editor UI; no direct Status API calls
 includes/class-ttfw-guestbook-api.php                     Tools Guestbook server-side client
 includes/class-ttfw-guestbook-settings.php                Guestbook credentials / selected book / Turnstile settings
-includes/class-ttfw-guestbook-connection-admin.php        Guestbook catalog, selection and remote creation
+includes/class-ttfw-guestbook-connection-admin.php        Guestbook catalog, selection, editing and remote creation
 includes/class-ttfw-guestbook-rest.php                    Local Guestbook REST proxy
 includes/class-ttfw-guestbook.php                         Guestbook shortcode/frontend integration
 includes/class-ttfw-guestbook-admin.php                   Owner-scoped Guestbook administration
 assets/guestbook.js                                       Local Guestbook frontend client
+tests/guestbook-connection-contract-test.php              Guestbook edit/menu wiring regression checks
 tests/statuspage-contract-test.php                        Deterministic Statuspage contract regression checks
 tests/statuspage-block-test.php                           Deterministic Gutenberg metadata/renderer wiring checks
 ```
 
 ## Verification
 
-The GitHub workflow runs PHP syntax checks on PHP 7.4 and 8.4, focused Statuspage contract and Gutenberg block tests on both versions, and the official WordPress Plugin Check action.
+The GitHub workflow runs PHP syntax checks on PHP 7.4 and 8.4, focused contract tests, and the official WordPress Plugin Check action.
 
 ## License
 
