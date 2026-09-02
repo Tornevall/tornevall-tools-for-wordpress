@@ -20,9 +20,9 @@ $checks = [
     'edit form posts the existing guestbook id' => strpos($connection, 'name="guestbook_id"') !== false,
     'selected local slug is refreshed after update' => strpos($connection, 'TTFW_Guestbook_Settings::set_selected_guestbook( $guestbook_id, $updated_slug )') !== false,
     'Tools Guestbook is removed from the core Tools menu' => strpos($connection, "remove_submenu_page( 'tools.php', TTFW_Guestbook_Admin::PAGE_SLUG )") !== false,
-    'Tools Guestbook is registered below Tornevall Tools' => strpos($connection, "TTFW_Settings::PAGE_SLUG") !== false && strpos($connection, "TTFW_Guestbook_Admin::PAGE_SLUG") !== false,
+    'Tools Guestbook is registered below Tornevall Tools' => strpos($connection, 'TTFW_Settings::PAGE_SLUG') !== false && strpos($connection, 'TTFW_Guestbook_Admin::PAGE_SLUG') !== false,
     'API client supports owner guestbook updates' => strpos($api, 'function update_owned_book') !== false,
-    'API client uses the unversioned owned-books endpoint' => strpos($api, "'/owned/books/' . $guestbook_id") !== false,
+    'API client uses the unversioned owned-books endpoint' => strpos($api, "'/owned/books/' . \$guestbook_id") !== false,
     'API client uses PATCH for updates' => strpos($api, "'PATCH'") !== false,
     'no versioned guestbook API path was introduced' => strpos($api, '/v1/') === false && strpos($api, '/v2/') === false,
 ];
