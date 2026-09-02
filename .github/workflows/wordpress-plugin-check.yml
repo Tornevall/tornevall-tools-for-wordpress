@@ -38,6 +38,9 @@ jobs:
       - name: Lint PHP files
         run: find . -name '*.php' -not -path './vendor/*' -print -exec php -l {} \;
 
+      - name: Run Guestbook connection contract tests
+        run: php tests/guestbook-connection-contract-test.php
+
       - name: Run Statuspage contract tests
         run: php tests/statuspage-contract-test.php
 
