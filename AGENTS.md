@@ -126,6 +126,10 @@ The Guestbook connection page may request `GET /api/guestbook/owned/books` only 
 
 Remote creation through `POST /api/guestbook/owned/books` is permitted only when Tools reports that the configured token can create. The current Tools contract requires the same token to have both `guestbook.write` and `guestbook.moderate`. New books are always owned by the Tools user behind the token; WordPress never sends or chooses an owner id.
 
+Existing owned guestbooks may be edited only through the owner-scoped unversioned `PATCH /api/guestbook/owned/books/{guestbook}` contract when Tools reports `can_update`. Editing requires both `guestbook.write` and `guestbook.moderate`; WordPress must never send or alter an owner id. If the edited book is currently selected locally, refresh the stored id/slug only from the successful Tools response so a slug change cannot leave the site bound to stale local metadata.
+
+Both **Tools Guestbook** settings/moderation and **Guestbook connection** belong under the plugin's **Tornevall Tools** top-level menu. Do not reintroduce **Tools Guestbook** as a visible item under WordPress core **Tools**.
+
 When the manually configured Guestbook token is replaced, clear the stored guestbook selection so a selection from the previous Tools user cannot be reused accidentally.
 
 Public signing is protected by Cloudflare Turnstile when configured. The Turnstile secret stays server-side. The browser receives only the public site key and single-use challenge token. Each external WordPress installation supplies its own Turnstile configuration; the plugin must not ship a shared Tools Turnstile secret.
@@ -196,6 +200,7 @@ Every development request should have a linked issue/ticket and a PR.
 
 ```bash
 find . -name "*.php" -print -exec php -l {} \;
+php tests/guestbook-connection-contract-test.php
 php tests/statuspage-contract-test.php
 php tests/statuspage-block-test.php
 ```
