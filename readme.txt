@@ -25,7 +25,7 @@ Service credentials are kept server-side. Integrations only contact external ser
 
 = Statuspage =
 
-Open `Tornevall Tools -> Statuspage` and configure the public Tools status page slug. The plugin reads the documented public Status Platform API and stores a bounded live cache plus the last successful snapshot.
+Open `Tornevall Tools -> Statuspage` and configure the public Tools status page slug. The plugin reads the canonical unversioned public Status Platform API and stores a bounded live cache plus the last successful snapshot.
 
 For the block editor, insert the `Tornevall Statuspage` block from the Tornevall Tools category. The block JavaScript only provides editor controls and a placeholder; frontend rendering is dynamic/server-side and uses the same PHP renderer, cache and outage semantics as the shortcode. Opening the editor does not trigger a Status Platform request merely to preview the block.
 
@@ -37,7 +37,7 @@ To include recent resolved incidents, enable the block inspector option or use:
 
 `[tornevall_statuspage history="1"]`
 
-The WordPress rendering includes the overall status, components, active incidents and incident update timelines. Tools remains authoritative for all status data.
+The WordPress rendering includes the overall status, components, active incidents and incident update timelines. Tools remains authoritative for all status data. The plugin normalizes the current unversioned ToolsAPI response server-side; it does not require a URL API version or schema-version field.
 
 Status semantics deliberately distinguish a confirmed outage from a communication problem. A confirmed `major_outage` may be rendered as critical/red by a theme. Missing configuration is neutral. Unknown status remains unknown. If the Tools API cannot be reached, WordPress uses the last successful snapshot when available and marks it stale instead of reporting an outage. If no successful snapshot exists, the integration reports the status as temporarily unavailable, not as a major outage.
 
@@ -100,7 +100,7 @@ This plugin integrates with Tornevall Networks Tools at `https://tools.tornevall
 
 Statuspage uses the public read-only endpoint:
 
-`GET https://tools.tornevall.net/api/status/v1/pages/{slug}`
+`GET https://tools.tornevall.net/api/statuspage/{slug}`
 
 The request contains only the configured public status page slug and normal HTTP metadata. No bearer credential is required. The returned public status data may be cached locally so the WordPress page can show the last known result if the live service is temporarily unavailable. The Gutenberg editor script does not call this endpoint directly.
 
@@ -235,12 +235,13 @@ No. Dynamic DNS is disabled by default.
 == Changelog ==
 
 = Unreleased =
+* Statuspage now uses the canonical unversioned `GET /api/statuspage/{slug}` ToolsAPI contract and no longer requires URL API versions or a `schema_version` field.
 * Existing owned guestbooks can now be edited from Guestbook connection, including slug and site metadata, instead of requiring a duplicate book.
 * Tools Guestbook settings/moderation now appears under the Tornevall Tools menu instead of WordPress core Tools.
 
 = 0.3.0 =
 * Added Statuspage configuration and public rendering through the native Gutenberg block and `[tornevall_statuspage]`.
-* Added Tools Status Platform v1 public response validation, component status and incident timelines.
+* Added public Status Platform response validation, component status and incident timelines.
 * Added bounded live caching and last-successful fallback. Communication failures are stale/unavailable, not major outages.
 * Added focused Statuspage contract and Gutenberg block tests to the PHP compatibility CI matrix.
 
