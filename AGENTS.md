@@ -25,7 +25,7 @@ AI work remains separate until it is production-ready. DNSBL/FraudBL must not be
 - `TTFW_Dynamic_DNS_Module` owns Dynamic DNS updates and WP-Cron scheduling.
 - `TTFW_Guestbook_API`, `TTFW_Guestbook_REST`, `TTFW_Guestbook_Settings`, `TTFW_Guestbook`, `TTFW_Guestbook_Admin` and `TTFW_Guestbook_Connection_Admin` own the central Tools Guestbook integration.
 - `TTFW_Statuspage_Settings` owns the configured public status-page slug and bounded live-cache TTL.
-- `TTFW_Statuspage_API` consumes and validates the versioned public Status Platform contract at `/api/status/v1/pages/{slug}`.
+- `TTFW_Statuspage_API` consumes and validates the canonical unversioned public Status Platform contract at `/api/statuspage/{slug}`.
 - `TTFW_Statuspage` owns last-good caching, health semantics, the canonical Statuspage renderer, `[tornevall_statuspage]`, and the dynamic Gutenberg block registration.
 - `blocks/statuspage/block.json` and `blocks/statuspage/index.js` define the Statuspage block metadata and editor-only UI.
 - `TTFW_Statuspage_Admin` renders the Statuspage setup and diagnostics surface.
@@ -39,6 +39,10 @@ Each integration should solve one independently useful WordPress problem and onl
 Remote service use must be documented in `readme.txt`. Credentials stay server-side. State-changing admin actions require capability checks and nonces. Public REST routes need explicit permission behavior and strict validation.
 
 Do not make authenticated external requests merely because the plugin was activated.
+
+### ToolsAPI API versioning
+
+All first-party ToolsAPI integrations in this plugin must use the canonical unversioned ToolsAPI routes. Do not introduce or consume URL namespaces such as `/v1`, `/v2`, `/api/v1/...`, `/api/{service}/v1/...`, versioned SDK directories, or equivalent WordPress-side proxy paths for ToolsAPI services. Existing first-party versioned references are legacy debt and must be migrated to the canonical unversioned route when the integration is touched. External providers may retain version strings when those are part of the provider's own protocol.
 
 ## Gutenberg blocks
 
@@ -56,13 +60,13 @@ Blocks for Tools integrations should be thin WordPress editor surfaces over the 
 
 Tools remains authoritative for status pages, components, incidents and incident updates. WordPress is a public read/render layer and must not introduce a second Status Platform database or local incident editor.
 
-The public v1 read contract is:
+The public read contract is:
 
 ```text
-GET https://tools.tornevall.net/api/status/v1/pages/{slug}
+GET https://tools.tornevall.net/api/statuspage/{slug}
 ```
 
-The client must require schema version `1.0` and normalize all externally supplied status, page, component and incident fields before rendering.
+The client must normalize the current canonical payload and validate the requested slug before rendering. It must not require a URL API version or `schema_version` field.
 
 Status health semantics are part of the contract:
 
@@ -86,7 +90,7 @@ Votech is a client integration of the canonical ToolsAPI Votech service. WordPre
 - Use the canonical ToolsAPI Votech API namespace directly under `/api/votech/...`.
 - Do not introduce URL-based Votech API versions such as `/api/votech/v1`, `/api/votech/v2`, `/v1`, `/v2`, versioned SDK directories, or equivalent route namespaces.
 - Do not add a versioned WordPress-side proxy path merely to wrap the unversioned ToolsAPI Votech API.
-- This is an explicit architecture rule required to match the current ToolsAPI API structure. It overrides any generic preference to version new APIs in the URL.
+- This follows the global first-party ToolsAPI unversioned-route rule above.
 - Consume the same canonical Votech SDK/embed contract used by ToolsAPI issue Tornevall/toolsApi#1001 and the WordPress integration tickets #22/#23.
 - If a future concrete compatibility problem requires a migration mechanism, handle that specific case explicitly instead of pre-creating version namespaces.
 
