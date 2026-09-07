@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Fetches and validates public status snapshots from Tornevall Tools.
  */
 class TTFW_Statuspage_API {
-	const API_PREFIX = '/api/status/v1/pages/';
+	const API_PREFIX = '/api/statuspage/';
 
 	/**
 	 * @param string $slug Status page slug.
@@ -34,38 +34,48 @@ class TTFW_Statuspage_API {
 	}
 
 	/**
+	 * Normalize the canonical unversioned ToolsAPI response into the plugin's
+	 * renderer/cache shape. Keeping this adapter server-side preserves the
+	 * existing shortcode/block renderer while Tools remains authoritative.
+	 *
 	 * @param array<string,mixed> $data Raw payload.
 	 * @param string              $expected_slug Expected page slug.
 	 * @return array<string,mixed>|WP_Error
 	 */
 	private function normalize_payload( $data, $expected_slug ) {
-		$schema = isset( $data['schema_version'] ) ? sanitize_text_field( (string) $data['schema_version'] ) : '';
-		$page = isset( $data['page'] ) && is_array( $data['page'] ) ? $data['page'] : array();
-		$slug = isset( $page['slug'] ) ? TTFW_Statuspage_Settings::sanitize_slug( $page['slug'] ) : '';
-		if ( '1.0' !== $schema || '' === $slug || $expected_slug !== $slug ) {
+		$slug = isset( $data['slug'] ) ? TTFW_Statuspage_Settings::sanitize_slug( $data['slug'] ) : '';
+		if ( '' === $slug || $expected_slug !== $slug ) {
 			return new WP_Error( 'ttfw_statuspage_invalid_payload', __( 'Tools returned an unsupported Statuspage response.', 'tornevall-tools-for-wordpress' ) );
 		}
 
-		$overall = isset( $data['overall'] ) && is_array( $data['overall'] ) ? $data['overall'] : array();
-		$status = self::normalize_status( $overall['status'] ?? 'unknown' );
+		$status = self::normalize_status( $data['status'] ?? 'unknown' );
+		$incidents = $this->normalize_incidents( $data['incidents'] ?? array() );
+		$active_incidents = array();
+		$incident_history = array();
+		foreach ( $incidents as $incident ) {
+			if ( 'resolved' === ( $incident['status'] ?? '' ) || '' !== ( $incident['resolved_at'] ?? '' ) ) {
+				$incident_history[] = $incident;
+			} else {
+				$active_incidents[] = $incident;
+			}
+		}
 
 		return array(
-			'schema_version' => '1.0',
 			'page' => array(
 				'slug'        => $slug,
-				'name'        => sanitize_text_field( (string) ( $page['name'] ?? $slug ) ),
-				'description' => sanitize_textarea_field( (string) ( $page['description'] ?? '' ) ),
-				'homepage_url'=> esc_url_raw( (string) ( $page['homepage_url'] ?? '' ) ),
+				'name'        => sanitize_text_field( (string) ( $data['name'] ?? $slug ) ),
+				'description' => sanitize_textarea_field( (string) ( $data['description'] ?? '' ) ),
+				'homepage_url'=> '',
 			),
 			'overall' => array(
 				'status'  => $status,
-				'label'   => sanitize_text_field( (string) ( $overall['label'] ?? self::status_label( $status ) ) ),
-				'message' => sanitize_textarea_field( (string) ( $overall['message'] ?? '' ) ),
+				'label'   => self::status_label( $status ),
+				'message' => '',
 			),
 			'components'       => $this->normalize_components( $data['components'] ?? array() ),
-			'active_incidents' => $this->normalize_incidents( $data['active_incidents'] ?? array() ),
-			'incident_history' => $this->normalize_incidents( $data['incident_history'] ?? array() ),
-			'generated_at'     => sanitize_text_field( (string) ( $data['generated_at'] ?? '' ) ),
+			'active_incidents' => $active_incidents,
+			'incident_history' => $incident_history,
+			'generated_at'     => sanitize_text_field( (string) ( $data['published_at'] ?? '' ) ),
 		);
 	}
 
@@ -85,11 +95,11 @@ class TTFW_Statuspage_API {
 			$status = self::normalize_status( $component['status'] ?? 'unknown' );
 			$output[] = array(
 				'id'           => absint( $component['id'] ?? 0 ),
-				'key'          => sanitize_key( (string) ( $component['key'] ?? '' ) ),
+				'key'          => '',
 				'name'         => sanitize_text_field( (string) ( $component['name'] ?? '' ) ),
 				'description'  => sanitize_textarea_field( (string) ( $component['description'] ?? '' ) ),
 				'status'       => $status,
-				'status_label' => sanitize_text_field( (string) ( $component['status_label'] ?? self::status_label( $status ) ) ),
+				'status_label' => self::status_label( $status ),
 			);
 		}
 		return $output;
@@ -117,18 +127,18 @@ class TTFW_Statuspage_API {
 					'id'         => absint( $update['id'] ?? 0 ),
 					'status'     => sanitize_key( (string) ( $update['status'] ?? 'unknown' ) ),
 					'message'    => sanitize_textarea_field( (string) ( $update['message'] ?? '' ) ),
-					'created_at' => sanitize_text_field( (string) ( $update['created_at'] ?? '' ) ),
+					'created_at' => sanitize_text_field( (string) ( $update['published_at'] ?? '' ) ),
 				);
 			}
 			$output[] = array(
 				'id'             => absint( $incident['id'] ?? 0 ),
-				'slug'           => sanitize_key( (string) ( $incident['slug'] ?? '' ) ),
+				'slug'           => '',
 				'title'          => sanitize_text_field( (string) ( $incident['title'] ?? '' ) ),
-				'severity'       => sanitize_key( (string) ( $incident['severity'] ?? 'unknown' ) ),
+				'severity'       => sanitize_key( (string) ( $incident['impact'] ?? 'unknown' ) ),
 				'status'         => sanitize_key( (string) ( $incident['status'] ?? 'unknown' ) ),
-				'public_summary' => sanitize_textarea_field( (string) ( $incident['public_summary'] ?? '' ) ),
-				'started_at'     => sanitize_text_field( (string) ( $incident['started_at'] ?? '' ) ),
-				'updated_at'     => sanitize_text_field( (string) ( $incident['updated_at'] ?? '' ) ),
+				'public_summary' => sanitize_textarea_field( (string) ( $incident['summary'] ?? '' ) ),
+				'started_at'     => sanitize_text_field( (string) ( $incident['opened_at'] ?? '' ) ),
+				'updated_at'     => '',
 				'resolved_at'    => sanitize_text_field( (string) ( $incident['resolved_at'] ?? '' ) ),
 				'updates'        => $updates,
 			);
