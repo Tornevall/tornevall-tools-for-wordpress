@@ -17,10 +17,10 @@ AI is not part of the current public runtime. DNSBL/FraudBL is not duplicated in
 
 ## Statuspage
 
-Tools is authoritative for Status Platform data. WordPress reads the public versioned endpoint:
+Tools is authoritative for Status Platform data. WordPress reads the canonical unversioned public endpoint:
 
 ```text
-GET https://tools.tornevall.net/api/status/v1/pages/{slug}
+GET https://tools.tornevall.net/api/statuspage/{slug}
 ```
 
 Configure the public status-page slug under **Tornevall Tools -> Statuspage** and add the native **Tornevall Statuspage** block from the Tornevall Tools block category. The block is dynamic/server-rendered: its JavaScript provides the editor experience and settings only, while frontend output uses the same PHP renderer, cache and outage semantics as the shortcode. Opening the editor does not trigger a Status Platform API request merely to preview the block.
@@ -37,7 +37,7 @@ Include recent resolved incident history either with the block inspector toggle 
 [tornevall_statuspage history="1"]
 ```
 
-The response contract is validated as Status Platform schema `1.0`. Public rendering includes the page title/description, overall status, components, active incidents and update timelines.
+The public response is normalized server-side from the current ToolsAPI payload. Public rendering includes the page title/description, overall status, components, active incidents and update timelines. ToolsAPI first-party endpoints are intentionally not URL-versioned.
 
 ### Status and cache semantics
 
@@ -136,7 +136,7 @@ Supported WP-Cron schedules are hourly, twice daily and daily. Administrators ca
 Tools is used for Statuspage public reads, account pairing, Guestbook and Dynamic DNS integrations.
 
 - Service: https://tools.tornevall.net/
-- Status Platform public API: `https://tools.tornevall.net/api/status/v1/pages/{slug}`
+- Status Platform public API: `https://tools.tornevall.net/api/statuspage/{slug}`
 - WordPress pairing API: https://tools.tornevall.net/api/integrations/wordpress/device
 - Guestbook API: https://tools.tornevall.net/api/guestbook
 - Dynamic DNS documentation: https://tools.tornevall.net/docs/en/dynamic-dns
@@ -170,7 +170,7 @@ includes/class-ttfw-tools-connection-admin.php            Tools account status a
 includes/class-ttfw-dynamic-dns-module.php                Dynamic DNS logic and WP-Cron
 includes/class-ttfw-module-registry.php                   Integration overview metadata
 includes/class-ttfw-statuspage-settings.php               Selected public status page and cache settings
-includes/class-ttfw-statuspage-api.php                    Status Platform v1 public response client/normalizer
+includes/class-ttfw-statuspage-api.php                    Canonical unversioned Status Platform public response client/normalizer
 includes/class-ttfw-statuspage.php                        Statuspage cache, health semantics, shared renderer, shortcode and block registration
 includes/class-ttfw-statuspage-admin.php                  Statuspage setup and diagnostics
 blocks/statuspage/block.json                              Statuspage Gutenberg block metadata

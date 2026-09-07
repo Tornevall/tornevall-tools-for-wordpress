@@ -9,7 +9,7 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 - Added editing for existing Tools guestbooks directly from **Tornevall Tools -> Guestbook connection**, including name, slug, theme, site URL, language, description and active/hosted state. The selected local guestbook slug is refreshed after a successful update. Tracked in #30.
 - Added a deterministic Guestbook connection contract test covering the update action, unversioned PATCH client path, selected-slug refresh and admin menu placement.
 - Added a native dynamic Gutenberg block for Statuspage under a Tornevall Tools block category, with an editor control for recent resolved incident history.
-- Added a first-class Statuspage integration backed by the Tornevall Tools public Status Platform API (`/api/status/v1/pages/{slug}`).
+- Added a first-class Statuspage integration backed by the Tornevall Tools public Status Platform API (`/api/statuspage/{slug}`).
 - Added a dedicated **Tornevall Tools -> Statuspage** setup and diagnostics page.
 - Added `[tornevall_statuspage]` rendering for overall state, components, active incidents and incident timelines, with optional resolved incident history through `history="1"`.
 - Added a bounded live cache and a persistent last-successful snapshot so temporary Tools/API failures can fall back to stale data.
@@ -23,6 +23,7 @@ All notable changes to Tornevall Tools for WordPress are documented here.
 
 ### Changed
 
+- Statuspage now consumes the canonical unversioned ToolsAPI contract at `GET /api/statuspage/{slug}` and adapts the current top-level page/component/incident payload to the existing WordPress renderer. URL API versions and `schema_version` gating were removed. Tracked in #32.
 - Moved the existing **Tools Guestbook** settings/moderation page out of WordPress core **Tools** and into the plugin's **Tornevall Tools** menu, next to **Guestbook connection**. Tracked in #30.
 - Statuspage shortcode and Gutenberg block now share one canonical PHP renderer so cache, incident history and outage semantics cannot drift between editor surfaces.
 - The Statuspage block editor is presentation-only and does not make Status Platform API requests merely because an editor opens a post.
